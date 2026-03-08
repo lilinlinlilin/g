@@ -24,6 +24,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map  // ← 新增这个 import！关键
 import kotlinx.coroutines.launch
 import java.io.File
 import kotlin.math.abs
@@ -33,164 +34,117 @@ val Context.soundDataStore: DataStore<Preferences> by preferencesDataStore(name 
 
 class MainActivity : ComponentActivity(), SensorEventListener {
 
-    private lateinit var sensorManager: SensorManager
-    private var accelerometer: Sensor? = null
-    private var currentPlayer: MediaPlayer? = null
-    private var selectedDescription by mutableStateOf<String?>(null)
+    // ... onCreate, onResume, onPause, onDestroy, onSensorChanged, playAudio 保持不变 ...
 
-    private val shakeThreshold = 15f
-    private var lastShakeTime = 0L
+    // ... 省略不变部分 ...
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-
-        sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
-        accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
-
-        setContent {
-            MaterialTheme {
-                Surface {
-                    SoundManagerScreen(
-                        selected = selectedDescription,
-                        onSelect = { selectedDescription = it }
-                    )
-                }
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_GAME)
-    }
-
-    override fun onPause() {
-        sensorManager.unregisterListener(this)
-        currentPlayer?.pause()
-        super.onPause()
-    }
-
-    override fun onDestroy() {
-        currentPlayer?.release()
-        super.onDestroy()
-    }
-
-    override fun onSensorChanged(event: SensorEvent?) {
-        if (event?.sensor?.type != Sensor.TYPE_ACCELEROMETER) return
-
-        val now = System.currentTimeMillis()
-        if (now - lastShakeTime < 400) return
-        lastShakeTime = now
-
-        val accel = sqrt(event.values.map { it * it }.sum()) - SensorManager.GRAVITY_EARTH
-        if (abs(accel) > shakeThreshold && selectedDescription != null) {
-            playSound(selectedDescription!!)
-        }
-    }
-
-    private fun playSound(desc: String) {
-        currentPlayer?.release()
-        val dir = File(filesDir, "sounds")
-        val file = File(dir, "$desc.ogg")  // 或改成 .mp3，根据你的文件后缀
-        if (file.exists()) {
-            currentPlayer = MediaPlayer().apply {
-                setDataSource(file.absolutePath)
-                prepare()
-                start()
-            }
-        }
-    }
-
-    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
 }
 
 @Composable
-fun SoundManagerScreen(
+fun SoundScreen(
     selected: String?,
     onSelect: (String) -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var sounds by remember { mutableStateOf(listOf<String>()) }
-    var showDialog by remember { mutableStateOf(false) }
-    var newDesc by remember { mutableStateOf("") }
+
+    var descriptions by remember { mutableStateOf(listOf<String>()) }
+    var showAddDialog by remember { mutableStateOf(false) }
+    var inputDesc by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
-        sounds = context.soundDataStore.data
-            .map { it[stringPreferencesKey("descriptions")]?.split(",")?.filter { it.isNotBlank() } ?: emptyList() }
-            .first()
+        context.soundDataStore.data
+            .map { prefs ->  // ← 显式写 prefs -> ... 避免 it 类型推断失败
+                val saved = prefs[stringPreferencesKey("descriptions")] ?: ""
+                if (saved.isNotEmpty()) saved.split(",").filter { it.isNotBlank() } else emptyList()
+            }
+            .collect { newList ->
+                descriptions = newList
+            }
     }
 
-    val soundsDirPath = remember { context.filesDir.resolve("sounds").absolutePath }
+    val dirPath = remember { context.filesDir.resolve("sounds").absolutePath }
 
     Scaffold(
         floatingActionButton = {
-            FloatingActionButton(onClick = { showDialog = true }) {
+            FloatingActionButton(onClick = { showAddDialog = true }) {
                 Text("+")
             }
         }
-    ) { padding ->
+    ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
+                .padding(innerPadding)
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("摇晃播放声音", style = MaterialTheme.typography.headlineMedium)
+            Text("摇一摇播放声音", style = MaterialTheme.typography.headlineMedium)
             Spacer(Modifier.height(8.dp))
-            Text("把音频文件放到：\n$soundsDirPath\n文件名 = 描述.ogg 或 .mp3", style = MaterialTheme.typography.bodySmall)
+            Text(
+                "把音频文件放到：\n$dirPath\n文件名必须等于描述（如 '开心.ogg'）",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.Gray
+            )
             Spacer(Modifier.height(24.dp))
 
-            if (sounds.isEmpty()) {
-                Text("点击 + 添加描述", color = Color.Gray)
-            }
-
-            LazyColumn {
-                items(sounds) { desc ->
-                    OutlinedButton(
-                        onClick = { onSelect(desc) },
-                        border = BorderStroke(2.dp, if (desc == selected) Color.Blue else Color.LightGray),
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                    ) {
-                        Text(desc)
+            if (descriptions.isEmpty()) {
+                Text("还没有声音描述\n点击 + 添加", color = Color.Gray)
+            } else {
+                LazyColumn {
+                    items(descriptions) { desc ->
+                        OutlinedButton(
+                            onClick = { onSelect(desc) },
+                            border = BorderStroke(
+                                width = 2.dp,
+                                color = if (desc == selected) Color.Blue else Color.LightGray
+                            ),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                        ) {
+                            Text(desc)
+                        }
                     }
                 }
             }
         }
     }
 
-    if (showDialog) {
+    if (showAddDialog) {
         AlertDialog(
-            onDismissRequest = { showDialog = false },
-            title = { Text("添加声音描述") },
+            onDismissRequest = { showAddDialog = false },
+            title = { Text("添加新声音") },
             text = {
                 OutlinedTextField(
-                    value = newDesc,
-                    onValueChange = { newDesc = it },
-                    label = { Text("描述（按钮名称）") },
+                    value = inputDesc,
+                    onValueChange = { inputDesc = it.trim() },
+                    label = { Text("描述（按钮名）") },
                     singleLine = true
                 )
             },
             confirmButton = {
                 TextButton(onClick = {
-                    if (newDesc.isNotBlank()) {
+                    if (inputDesc.isNotBlank()) {
+                        val newList = (descriptions + inputDesc).distinct()
                         scope.launch {
                             context.soundDataStore.updateData { prefs ->
-                                val current = prefs[stringPreferencesKey("descriptions")] ?: ""
-                                val updated = if (current.isEmpty()) newDesc else "$current,$newDesc"
+                                val updated = newList.joinToString(",")
                                 prefs.toMutablePreferences().apply {
                                     set(stringPreferencesKey("descriptions"), updated)
                                 }
                             }
                         }
-                        sounds = sounds + newDesc
+                        inputDesc = ""
                     }
-                    showDialog = false
-                    newDesc = ""
-                }) { Text("添加") }
+                    showAddDialog = false
+                }) {
+                    Text("添加")
+                }
             },
-            dismissButton = { TextButton(onClick = { showDialog = false }) { Text("取消") } }
+            dismissButton = {
+                TextButton(onClick = { showAddDialog = false }) { Text("取消") }
+            }
         )
     }
 }
