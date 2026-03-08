@@ -5,17 +5,17 @@ androidx_test = "1.7.0"
 androidx_test_ext = "1.3.0"
 appcompat = "1.7.1"
 compile_sdk_version = "36"
-compose-bom = "2025.12.01"
+compose-bom = "2026.02.01"          # ← 升级到 2026.02.01（最新稳定，包含 material3 1.4.0+）
 compose_compilerextension = "1.5.5"
 constraint_layout = "2.2.1"
 core_ktx = "1.17.0"
+datastore = "1.2.0"                 # ← 新增 DataStore
 detekt = "1.23.8"
 espresso_core = "3.7.0"
 junit = "4.13.2"
 kotlin = "2.3.0"
 min_sdk_version = "23"
 nexus_publish = "2.0.0"
-target_sdk_version = "36"
 
 [libraries]
 junit = { module = "junit:junit", version.ref = "junit" }
@@ -34,6 +34,8 @@ compose_ui = { module = "androidx.compose.ui:ui" }
 compose_ui_tooling = { module = "androidx.compose.ui:ui-tooling" }
 compose_ui_test_junit4 = { module = "androidx.compose.ui:ui-test-junit4" }
 compose_ui_test_manifest = { module = "androidx.compose.ui:ui-test-manifest" }
+androidx-compose-material3 = { module = "androidx.compose.material3:material3" }  # ← 新增 Material 3
+androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }  # ← 新增 DataStore
 detekt_formatting = { module = "io.gitlab.arturbosch.detekt:detekt-formatting", version.ref = "detekt" }
 espresso_core = { module = "androidx.test.espresso:espresso-core", version.ref = "espresso_core" }
 agp = { module = "com.android.tools.build:gradle", version.ref = "agp" }
