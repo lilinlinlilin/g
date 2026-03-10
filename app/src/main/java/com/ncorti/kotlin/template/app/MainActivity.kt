@@ -12,6 +12,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -43,7 +44,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     private var currentPlayer: MediaPlayer? = null
     private var selectedDesc by mutableStateOf<String?>(null)
 
-    private val shakeThreshold = 12f  // 调低一点，更容易触发摇晃
+    private val shakeThreshold = 12f
     private var lastShake = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -189,39 +190,36 @@ fun SoundScreen(
                     items(descriptions) { desc ->
                         val isSelected = desc == selected
 
-                        var pressStartTime by remember { mutableLongStateOf(0L) }
-
-                        OutlinedButton(
-                            onClick = { /* 故意留空，让 pointerInput 完全控制 */ },
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp)
                                 .pointerInput(Unit) {
                                     detectTapGestures(
-                                        onPress = {
-                                            pressStartTime = System.currentTimeMillis()
-
-                                            val success = tryAwaitRelease()
-
-                                            val pressDuration = System.currentTimeMillis() - pressStartTime
-
-                                            if (success) {
-                                                if (pressDuration < 300L) {  // 短按：点击选中
-                                                    onSelect(desc)
-                                                } else {  // 长按：编辑/删除
-                                                    editingDesc = desc
-                                                }
+                                        onPress = { offset ->
+                                            // 等待长按或取消
+                                            val success = awaitLongPressOrCancellation(offset)
+                                            if (success != null) {
+                                                // 长按成功，弹出编辑/删除
+                                                editingDesc = desc
+                                            } else {
+                                                // 短按或取消：选中
+                                                onSelect(desc)
                                             }
-                                            // 如果 success = false（取消），什么都不做
                                         }
                                     )
-                                },
-                            border = BorderStroke(
-                                width = 2.dp,
-                                color = if (isSelected) Color.Blue else Color.LightGray
-                            )
+                                }
                         ) {
-                            Text(desc)
+                            OutlinedButton(
+                                onClick = { /* 留空，避免重复消费 */ },
+                                border = BorderStroke(
+                                    width = 2.dp,
+                                    color = if (isSelected) Color.Blue else Color.LightGray
+                                ),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(desc)
+                            }
                         }
                     }
                 }
