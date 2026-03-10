@@ -12,7 +12,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -196,22 +195,20 @@ fun SoundScreen(
                                 .padding(vertical = 4.dp)
                                 .pointerInput(Unit) {
                                     detectTapGestures(
-                                        onPress = { offset ->
-                                            // 等待长按或取消
-                                            val success = awaitLongPressOrCancellation(offset)
-                                            if (success != null) {
-                                                // 长按成功，弹出编辑/删除
-                                                editingDesc = desc
-                                            } else {
-                                                // 短按或取消：选中
-                                                onSelect(desc)
-                                            }
+                                        onLongPress = {
+                                            editingDesc = desc
+                                            // 可选调试：确认长按被触发
+                                            // Toast.makeText(context, "长按检测到：$desc", Toast.LENGTH_SHORT).show()
                                         }
                                     )
                                 }
                         ) {
                             OutlinedButton(
-                                onClick = { /* 留空，避免重复消费 */ },
+                                onClick = {
+                                    onSelect(desc)
+                                    // 可选调试：确认点击被触发
+                                    // Toast.makeText(context, "点击选中：$desc", Toast.LENGTH_SHORT).show()
+                                },
                                 border = BorderStroke(
                                     width = 2.dp,
                                     color = if (isSelected) Color.Blue else Color.LightGray
