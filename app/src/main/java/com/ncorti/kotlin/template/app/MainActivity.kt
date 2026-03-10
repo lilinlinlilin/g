@@ -12,7 +12,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -21,8 +20,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
@@ -43,7 +40,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     private var currentPlayer: MediaPlayer? = null
     private var selectedDesc by mutableStateOf<String?>(null)
 
-    private val shakeThreshold = 12f
+    private val shakeThreshold = 12f  // 降低阈值，更容易触发
     private var lastShake = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -89,7 +86,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         if (event?.sensor?.type != Sensor.TYPE_ACCELEROMETER) return
 
         val now = System.currentTimeMillis()
-        if (now - lastShake < 300) return
+        if (now - lastShake < 300) return  // 缩短防抖时间
         lastShake = now
 
         val x = event.values[0].toDouble()
@@ -106,7 +103,10 @@ class MainActivity : ComponentActivity(), SensorEventListener {
 
     private fun playAudio(desc: String) {
         currentPlayer?.release()
-        val soundsDir = getExternalFilesDir(null)?.resolve("sounds") ?: return
+        val soundsDir = getExternalFilesDir(null)?.resolve("sounds") ?: run {
+            Toast.makeText(this, "无法获取存储路径", Toast.LENGTH_LONG).show()
+            return
+        }
         if (!soundsDir.exists()) soundsDir.mkdirs()
 
         val audioFile = File(soundsDir, desc)
@@ -120,7 +120,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                 }
                 Toast.makeText(this@MainActivity, "开始播放：$desc", Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
-                Toast.makeText(this@MainActivity, "播放失败：${e.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(this@MainActivity, "播放失败：${e.localizedMessage}", Toast.LENGTH_LONG).show()
             }
         } else {
             Toast.makeText(this@MainActivity, "未找到文件：$desc", Toast.LENGTH_SHORT).show()
@@ -174,40 +174,41 @@ fun SoundScreen(
             Text("摇一摇播放声音", style = MaterialTheme.typography.headlineMedium)
             Spacer(Modifier.height(16.dp))
             Text(
-                "音频路径：\n$dirPath\n" +
+                "音频文件路径：\n$dirPath\n" +
                 "文件名必须完全等于描述（包括后缀，如 '开心.ogg' 或 '笑声.mp3'）\n" +
-                "位置：存储 → Android → data → com.ncorti.kotlin.template.app → files → sounds",
+                "路径位置：存储 → Android → data → com.ncorti.kotlin.template.app → files → sounds",
                 style = MaterialTheme.typography.bodyMedium,
                 color = Color.Gray
             )
             Spacer(Modifier.height(32.dp))
 
             if (descriptions.isEmpty()) {
-                Text("还没有声音描述\n点击 + 添加", color = Color.Gray)
+                Text("还没有声音描述\n点击右下角 + 添加", color = Color.Gray)
             } else {
                 LazyColumn {
                     items(descriptions) { desc ->
                         val isSelected = desc == selected
-                        Box(
+                        Card(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp)
-                                .pointerInput(Unit) {
-                                    detectTapGestures(
-                                        onLongPress = { editingDesc = desc }
-                                    )
-                                }
-                        ) {
-                            OutlinedButton(
-                                onClick = { onSelect(desc) },
-                                border = BorderStroke(
-                                    width = 2.dp,
-                                    color = if (isSelected) Color.Blue else Color.LightGray
+                                .combinedClickable(
+                                    onClick = { onSelect(desc) },
+                                    onLongClick = { editingDesc = desc }
                                 ),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(desc)
-                            }
+                            border = BorderStroke(
+                                width = 2.dp,
+                                color = if (isSelected) Color.Blue else Color.LightGray
+                            ),
+                            shape = MaterialTheme.shapes.medium,
+                            elevation = CardDefaults.cardElevation(2.dp)
+                        ) {
+                            Text(
+                                text = desc,
+                                modifier = Modifier.padding(16.dp),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = if (isSelected) Color.Blue else Color.Black
+                            )
                         }
                     }
                 }
@@ -215,6 +216,7 @@ fun SoundScreen(
         }
     }
 
+    // 添加对话框
     if (showAddDialog) {
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
@@ -233,12 +235,12 @@ fun SoundScreen(
                         val newList = (descriptions + inputDesc).distinct()
                         scope.launch {
                             context.soundDataStore.updateData { prefs ->
-                                val updated = newList.joinToString(",")
                                 prefs.toMutablePreferences().apply {
-                                    set(stringPreferencesKey("descriptions"), updated)
+                                    set(stringPreferencesKey("descriptions"), newList.joinToString(","))
                                 }
                             }
                         }
+                        Toast.makeText(context, "已添加：$inputDesc", Toast.LENGTH_SHORT).show()
                         inputDesc = ""
                     }
                     showAddDialog = false
@@ -252,6 +254,7 @@ fun SoundScreen(
         )
     }
 
+    // 编辑/删除对话框
     if (editingDesc != null) {
         var editInput by remember { mutableStateOf(editingDesc!!) }
         AlertDialog(
@@ -272,16 +275,16 @@ fun SoundScreen(
                         val newList = descriptions.map { if (it == old) editInput else it }
                         scope.launch {
                             context.soundDataStore.updateData { prefs ->
-                                val updated = newList.joinToString(",")
                                 prefs.toMutablePreferences().apply {
-                                    set(stringPreferencesKey("descriptions"), updated)
+                                    set(stringPreferencesKey("descriptions"), newList.joinToString(","))
                                 }
                             }
                         }
+                        Toast.makeText(context, "已修改为：$editInput", Toast.LENGTH_SHORT).show()
                     }
                     editingDesc = null
                 }) {
-                    Text("保存修改")
+                    Text("保存")
                 }
             },
             dismissButton = {
@@ -291,12 +294,12 @@ fun SoundScreen(
                         val newList = descriptions.filter { it != toDelete }
                         scope.launch {
                             context.soundDataStore.updateData { prefs ->
-                                val updated = newList.joinToString(",")
                                 prefs.toMutablePreferences().apply {
-                                    set(stringPreferencesKey("descriptions"), updated)
+                                    set(stringPreferencesKey("descriptions"), newList.joinToString(","))
                                 }
                             }
                         }
+                        Toast.makeText(context, "已删除：$toDelete", Toast.LENGTH_SHORT).show()
                         editingDesc = null
                     }) {
                         Text("删除")
