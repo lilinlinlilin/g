@@ -22,7 +22,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.consumeAllChanges
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -197,18 +196,17 @@ fun SoundScreen(
                                 .padding(vertical = 4.dp)
                                 .pointerInput(Unit) {
                                     while (true) {
-                                        // 等待第一个按下事件
+                                        // 等待按下事件
                                         val down = awaitFirstDown(requireUnconsumed = false)
 
                                         // 等待长按或取消
-                                        val change = awaitLongPressOrCancellation(down.id)
+                                        val longPress = awaitLongPressOrCancellation(down.id)
 
-                                        if (change != null) {
+                                        if (longPress != null) {
                                             // 长按成功
-                                            change.consumeAllChanges()  // 消费事件，防止向下传播
                                             editingDesc = desc
                                         } else {
-                                            // 短按或取消 → 选中，并消费事件
+                                            // 短按或取消 → 选中
                                             onSelect(desc)
                                         }
                                     }
