@@ -43,7 +43,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     private var currentPlayer: MediaPlayer? = null
     private var selectedDesc by mutableStateOf<String?>(null)
 
-    private val shakeThreshold = 12f  // 调低灵敏度，更容易触发摇晃
+    private val shakeThreshold = 12f  // 调低一点，更容易触发摇晃
     private var lastShake = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -89,7 +89,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         if (event?.sensor?.type != Sensor.TYPE_ACCELEROMETER) return
 
         val now = System.currentTimeMillis()
-        if (now - lastShake < 300) return  // 缩短冷却时间，避免连发
+        if (now - lastShake < 300) return
         lastShake = now
 
         val x = event.values[0].toDouble()
@@ -102,16 +102,11 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         }
     }
 
-    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
-        // 空实现
-    }
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
 
     private fun playAudio(desc: String) {
         currentPlayer?.release()
-        val soundsDir = getExternalFilesDir(null)?.resolve("sounds") ?: run {
-            Toast.makeText(this, "无法获取存储路径", Toast.LENGTH_LONG).show()
-            return
-        }
+        val soundsDir = getExternalFilesDir(null)?.resolve("sounds") ?: return
         if (!soundsDir.exists()) soundsDir.mkdirs()
 
         val audioFile = File(soundsDir, desc)
@@ -125,7 +120,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                 }
                 Toast.makeText(this@MainActivity, "开始播放：$desc", Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
-                Toast.makeText(this@MainActivity, "播放失败：${e.localizedMessage}", Toast.LENGTH_LONG).show()
+                Toast.makeText(this@MainActivity, "播放失败：${e.message}", Toast.LENGTH_LONG).show()
             }
         } else {
             Toast.makeText(this@MainActivity, "未找到音频文件：$desc", Toast.LENGTH_SHORT).show()
@@ -179,8 +174,8 @@ fun SoundScreen(
             Text("摇一摇播放声音", style = MaterialTheme.typography.headlineMedium)
             Spacer(Modifier.height(16.dp))
             Text(
-                "音频文件路径：\n$dirPath\n" +
-                "文件名必须完全等于描述（包括后缀，例如 '开心.ogg' 或 '笑声.mp3'）\n" +
+                "音频路径：\n$dirPath\n" +
+                "文件名必须完全等于描述（包括后缀，如 '开心.ogg' 或 '笑声.mp3'）\n" +
                 "位置：存储 → Android → data → com.ncorti.kotlin.template.app → files → sounds",
                 style = MaterialTheme.typography.bodyMedium,
                 color = Color.Gray
@@ -188,32 +183,45 @@ fun SoundScreen(
             Spacer(Modifier.height(32.dp))
 
             if (descriptions.isEmpty()) {
-                Text("还没有声音描述\n点击右下角 + 添加", color = Color.Gray)
+                Text("还没有声音描述\n点击 + 添加", color = Color.Gray)
             } else {
                 LazyColumn {
                     items(descriptions) { desc ->
                         val isSelected = desc == selected
-                        Box(
+
+                        var pressStartTime by remember { mutableLongStateOf(0L) }
+
+                        OutlinedButton(
+                            onClick = { /* 故意留空，让 pointerInput 完全控制 */ },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp)
                                 .pointerInput(Unit) {
                                     detectTapGestures(
-                                        onTap = { onSelect(desc) },           // 短按：选中
-                                        onLongPress = { editingDesc = desc }  // 长按：编辑/删除
+                                        onPress = {
+                                            pressStartTime = System.currentTimeMillis()
+
+                                            val success = tryAwaitRelease()
+
+                                            val pressDuration = System.currentTimeMillis() - pressStartTime
+
+                                            if (success) {
+                                                if (pressDuration < 300L) {  // 短按：点击选中
+                                                    onSelect(desc)
+                                                } else {  // 长按：编辑/删除
+                                                    editingDesc = desc
+                                                }
+                                            }
+                                            // 如果 success = false（取消），什么都不做
+                                        }
                                     )
-                                }
+                                },
+                            border = BorderStroke(
+                                width = 2.dp,
+                                color = if (isSelected) Color.Blue else Color.LightGray
+                            )
                         ) {
-                            OutlinedButton(
-                                onClick = { /* 空，让 pointerInput 完全控制手势 */ },
-                                border = BorderStroke(
-                                    width = 2.dp,
-                                    color = if (isSelected) Color.Blue else Color.LightGray
-                                ),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(desc)
-                            }
+                            Text(desc)
                         }
                     }
                 }
@@ -230,7 +238,7 @@ fun SoundScreen(
                 OutlinedTextField(
                     value = inputDesc,
                     onValueChange = { inputDesc = it.trim() },
-                    label = { Text("描述（必须带后缀，如 '开心.ogg'）") },
+                    label = { Text("描述（带后缀，如 '开心.ogg'）") },
                     singleLine = true
                 )
             },
@@ -245,7 +253,6 @@ fun SoundScreen(
                                 }
                             }
                         }
-                        Toast.makeText(context, "已添加：$inputDesc", Toast.LENGTH_SHORT).show()
                         inputDesc = ""
                     }
                     showAddDialog = false
@@ -285,7 +292,6 @@ fun SoundScreen(
                                 }
                             }
                         }
-                        Toast.makeText(context, "已修改为：$editInput", Toast.LENGTH_SHORT).show()
                     }
                     editingDesc = null
                 }) {
@@ -304,7 +310,6 @@ fun SoundScreen(
                                 }
                             }
                         }
-                        Toast.makeText(context, "已删除：$toDelete", Toast.LENGTH_SHORT).show()
                         editingDesc = null
                     }) {
                         Text("删除")
