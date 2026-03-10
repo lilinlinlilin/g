@@ -189,7 +189,16 @@ fun SoundScreen(
                     items(descriptions) { desc ->
                         val isSelected = desc == selected
 
-                        Box(
+                        OutlinedButton(
+                            onClick = {
+                                onSelect(desc)
+                                // 调试用：确认点击被触发（测试完可删除）
+                                // Toast.makeText(context, "点击选中：$desc", Toast.LENGTH_SHORT).show()
+                            },
+                            border = BorderStroke(
+                                width = 2.dp,
+                                color = if (isSelected) Color.Blue else Color.LightGray
+                            ),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp)
@@ -197,26 +206,13 @@ fun SoundScreen(
                                     detectTapGestures(
                                         onLongPress = {
                                             editingDesc = desc
-                                            // 可选调试：确认长按被触发
+                                            // 调试用：确认长按被触发（测试完可删除）
                                             // Toast.makeText(context, "长按检测到：$desc", Toast.LENGTH_SHORT).show()
                                         }
                                     )
                                 }
                         ) {
-                            OutlinedButton(
-                                onClick = {
-                                    onSelect(desc)
-                                    // 可选调试：确认点击被触发
-                                    // Toast.makeText(context, "点击选中：$desc", Toast.LENGTH_SHORT).show()
-                                },
-                                border = BorderStroke(
-                                    width = 2.dp,
-                                    color = if (isSelected) Color.Blue else Color.LightGray
-                                ),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(desc)
-                            }
+                            Text(desc)
                         }
                     }
                 }
