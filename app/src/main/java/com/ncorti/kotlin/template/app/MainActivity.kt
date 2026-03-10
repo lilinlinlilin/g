@@ -108,17 +108,21 @@ class MainActivity : ComponentActivity(), SensorEventListener {
 
     private fun playAudio(desc: String) {
         currentPlayer?.release()
-        val soundsDir = File("/storage/emulated/0/sounds")
+        val soundsDir = getExternalFilesDir(null)?.resolve("sounds") ?: return
         if (!soundsDir.exists()) soundsDir.mkdirs()
 
-        // 直接使用 desc 作为完整文件名（用户需在描述中带后缀，如 "开心.ogg" 或 "笑声.mp3"）
+        // 直接使用 desc 作为完整文件名（用户需带后缀，如 "开心.ogg"）
         val audioFile = File(soundsDir, desc)
 
         if (audioFile.exists()) {
-            currentPlayer = MediaPlayer().apply {
-                setDataSource(audioFile.absolutePath)
-                prepare()
-                start()
+            try {
+                currentPlayer = MediaPlayer().apply {
+                    setDataSource(audioFile.absolutePath)
+                    prepare()
+                    start()
+                }
+            } catch (e: Exception) {
+                Toast.makeText(this@MainActivity, "播放失败：${e.message}", Toast.LENGTH_LONG).show()
             }
         } else {
             Toast.makeText(this@MainActivity, "未找到音频文件：$desc", Toast.LENGTH_SHORT).show()
@@ -150,7 +154,10 @@ fun SoundScreen(
             }
     }
 
-    val dirPath = "/storage/emulated/0/sounds"
+    // 显示用户可见的私有外部路径
+    val dirPath = remember {
+        context.getExternalFilesDir(null)?.resolve("sounds")?.absolutePath ?: "无法获取路径"
+    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -174,7 +181,8 @@ fun SoundScreen(
             Spacer(Modifier.height(16.dp))
             Text(
                 "把音频文件放到：\n$dirPath\n" +
-                "文件名必须完全等于描述（包括后缀，例如 '开心.ogg' 或 '笑声.mp3'）",
+                "文件名必须完全等于描述（包括后缀，例如 '开心.ogg' 或 '笑声.mp3'）\n" +
+                "路径通常在：Android/data/你的包名/files/sounds",
                 style = MaterialTheme.typography.bodyMedium,
                 color = Color.Gray
             )
