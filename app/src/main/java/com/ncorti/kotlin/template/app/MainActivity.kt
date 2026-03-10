@@ -7,13 +7,11 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.media.MediaPlayer
 import android.os.Bundle
-import android.os.Vibrator
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -22,10 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.core.content.getSystemService
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
@@ -45,7 +40,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     private var currentPlayer: MediaPlayer? = null
     private var selectedDesc by mutableStateOf<String?>(null)
 
-    private val shakeThreshold = 15f
+    private val shakeThreshold = 15f  // 如果摇不动，可调低到 10f 或 12f
     private var lastShake = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -104,14 +99,16 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         }
     }
 
-    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+        // 空实现
+    }
 
     private fun playAudio(desc: String) {
         currentPlayer?.release()
         val soundsDir = getExternalFilesDir(null)?.resolve("sounds") ?: return
         if (!soundsDir.exists()) soundsDir.mkdirs()
 
-        val audioFile = File(soundsDir, desc)
+        val audioFile = File(soundsDir, desc)  // 直接使用 desc（用户需带后缀）
 
         if (audioFile.exists()) {
             try {
@@ -120,11 +117,12 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                     prepare()
                     start()
                 }
+                Toast.makeText(this@MainActivity, "开始播放：$desc", Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
                 Toast.makeText(this@MainActivity, "播放失败：${e.message}", Toast.LENGTH_LONG).show()
             }
         } else {
-            Toast.makeText(this@MainActivity, "未找到音频文件：$desc", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this@MainActivity, "未找到文件：$desc", Toast.LENGTH_SHORT).show()
         }
     }
 }
@@ -136,7 +134,6 @@ fun SoundScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val vibrator = context.getSystemService<Vibrator>()
 
     var descriptions by remember { mutableStateOf(listOf<String>()) }
     var showAddDialog by remember { mutableStateOf(false) }
@@ -173,10 +170,15 @@ fun SoundScreen(
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("摇一摇播放声音", style = MaterialTheme.typography.headlineMedium)
+            Text(
+                "摇一摇播放声音",
+                style = MaterialTheme.typography.headlineMedium
+            )
             Spacer(Modifier.height(16.dp))
             Text(
-                "把音频文件放到：\n$dirPath\n文件名必须完全等于描述（包括后缀，例如 '开心.ogg' 或 '笑声.mp3'）",
+                "音频文件路径：\n$dirPath\n" +
+                "文件名必须完全等于描述（包括后缀，例如 '开心.ogg' 或 '笑声.mp3'）\n" +
+                "路径位置：手机存储 → Android → data → com.ncorti.kotlin.template.app → files → sounds",
                 style = MaterialTheme.typography.bodyMedium,
                 color = Color.Gray
             )
@@ -188,25 +190,26 @@ fun SoundScreen(
                 LazyColumn {
                     items(descriptions) { desc ->
                         val isSelected = desc == selected
-                        OutlinedButton(
-                            onClick = { onSelect(desc) },
+                        Card(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp)
-                                .pointerInput(desc) {  // 改用 desc 作为 key，避免 recomposition 问题
-                                    detectTapGestures(
-                                        onLongPress = {
-                                            vibrator?.vibrate(50L)  // 短振动反馈，确认长按触发
-                                            editingDesc = desc
-                                        }
-                                    )
-                                },
+                                .combinedClickable(
+                                    onClick = { onSelect(desc) },
+                                    onLongClick = { editingDesc = desc }
+                                ),
                             border = BorderStroke(
                                 width = 2.dp,
                                 color = if (isSelected) Color.Blue else Color.LightGray
-                            )
+                            ),
+                            shape = MaterialTheme.shapes.medium,
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                         ) {
-                            Text(desc)
+                            Text(
+                                text = desc,
+                                modifier = Modifier.padding(16.dp),
+                                style = MaterialTheme.typography.bodyLarge
+                            )
                         }
                     }
                 }
@@ -214,7 +217,7 @@ fun SoundScreen(
         }
     }
 
-    // 添加对话框（不变）
+    // 添加新声音
     if (showAddDialog) {
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
@@ -223,7 +226,7 @@ fun SoundScreen(
                 OutlinedTextField(
                     value = inputDesc,
                     onValueChange = { inputDesc = it.trim() },
-                    label = { Text("描述（必须包含后缀，如 '开心.ogg'）") },
+                    label = { Text("描述（必须带后缀，如 '开心.ogg'）") },
                     singleLine = true
                 )
             },
@@ -233,9 +236,8 @@ fun SoundScreen(
                         val newList = (descriptions + inputDesc).distinct()
                         scope.launch {
                             context.soundDataStore.updateData { prefs ->
-                                val updated = newList.joinToString(",")
                                 prefs.toMutablePreferences().apply {
-                                    set(stringPreferencesKey("descriptions"), updated)
+                                    set(stringPreferencesKey("descriptions"), newList.joinToString(","))
                                 }
                             }
                         }
@@ -252,9 +254,9 @@ fun SoundScreen(
         )
     }
 
-    // 编辑/删除对话框（不变）
+    // 编辑或删除
     if (editingDesc != null) {
-        var editInput by remember { mutableStateOf(editingDesc ?: "") }
+        var editInput by remember { mutableStateOf(editingDesc!!) }
         AlertDialog(
             onDismissRequest = { editingDesc = null },
             title = { Text("编辑或删除：$editingDesc") },
@@ -273,16 +275,15 @@ fun SoundScreen(
                         val newList = descriptions.map { if (it == old) editInput else it }
                         scope.launch {
                             context.soundDataStore.updateData { prefs ->
-                                val updated = newList.joinToString(",")
                                 prefs.toMutablePreferences().apply {
-                                    set(stringPreferencesKey("descriptions"), updated)
+                                    set(stringPreferencesKey("descriptions"), newList.joinToString(","))
                                 }
                             }
                         }
                     }
                     editingDesc = null
                 }) {
-                    Text("保存修改")
+                    Text("保存")
                 }
             },
             dismissButton = {
@@ -292,9 +293,8 @@ fun SoundScreen(
                         val newList = descriptions.filter { it != toDelete }
                         scope.launch {
                             context.soundDataStore.updateData { prefs ->
-                                val updated = newList.joinToString(",")
                                 prefs.toMutablePreferences().apply {
-                                    set(stringPreferencesKey("descriptions"), updated)
+                                    set(stringPreferencesKey("descriptions"), newList.joinToString(","))
                                 }
                             }
                         }
@@ -302,6 +302,7 @@ fun SoundScreen(
                     }) {
                         Text("删除")
                     }
+                    Spacer(Modifier.width(8.dp))
                     TextButton(onClick = { editingDesc = null }) { Text("取消") }
                 }
             }
