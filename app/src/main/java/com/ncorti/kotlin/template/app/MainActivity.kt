@@ -20,6 +20,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
@@ -27,6 +29,8 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import androidx.compose.ui.input.pointer.consumeAllChanges
+import androidx.compose.ui.input.pointer.detectTapGestures
 import java.io.File
 import kotlin.math.abs
 import kotlin.math.sqrt
@@ -40,7 +44,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     private var currentPlayer: MediaPlayer? = null
     private var selectedDesc by mutableStateOf<String?>(null)
 
-    private val shakeThreshold = 12f  // 降低阈值，更容易触发
+    private val shakeThreshold = 15f
     private var lastShake = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -86,7 +90,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         if (event?.sensor?.type != Sensor.TYPE_ACCELEROMETER) return
 
         val now = System.currentTimeMillis()
-        if (now - lastShake < 300) return  // 缩短防抖时间
+        if (now - lastShake < 400) return
         lastShake = now
 
         val x = event.values[0].toDouble()
@@ -99,17 +103,16 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         }
     }
 
-    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+        // 空实现
+    }
 
     private fun playAudio(desc: String) {
         currentPlayer?.release()
-        val soundsDir = getExternalFilesDir(null)?.resolve("sounds") ?: run {
-            Toast.makeText(this, "无法获取存储路径", Toast.LENGTH_LONG).show()
-            return
-        }
+        val soundsDir = getExternalFilesDir(null)?.resolve("sounds") ?: return
         if (!soundsDir.exists()) soundsDir.mkdirs()
 
-        val audioFile = File(soundsDir, desc)
+        val audioFile = File(soundsDir, desc)  // 直接使用 desc（带后缀）
 
         if (audioFile.exists()) {
             try {
@@ -120,10 +123,10 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                 }
                 Toast.makeText(this@MainActivity, "开始播放：$desc", Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
-                Toast.makeText(this@MainActivity, "播放失败：${e.localizedMessage}", Toast.LENGTH_LONG).show()
+                Toast.makeText(this@MainActivity, "播放失败：${e.message}", Toast.LENGTH_LONG).show()
             }
         } else {
-            Toast.makeText(this@MainActivity, "未找到文件：$desc", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this@MainActivity, "未找到音频文件：$desc", Toast.LENGTH_SHORT).show()
         }
     }
 }
@@ -174,41 +177,41 @@ fun SoundScreen(
             Text("摇一摇播放声音", style = MaterialTheme.typography.headlineMedium)
             Spacer(Modifier.height(16.dp))
             Text(
-                "音频文件路径：\n$dirPath\n" +
+                "音频路径：\n$dirPath\n" +
                 "文件名必须完全等于描述（包括后缀，如 '开心.ogg' 或 '笑声.mp3'）\n" +
-                "路径位置：存储 → Android → data → com.ncorti.kotlin.template.app → files → sounds",
+                "位置：存储 → Android → data → com.ncorti.kotlin.template.app → files → sounds",
                 style = MaterialTheme.typography.bodyMedium,
                 color = Color.Gray
             )
             Spacer(Modifier.height(32.dp))
 
             if (descriptions.isEmpty()) {
-                Text("还没有声音描述\n点击右下角 + 添加", color = Color.Gray)
+                Text("还没有声音描述\n点击 + 添加", color = Color.Gray)
             } else {
                 LazyColumn {
                     items(descriptions) { desc ->
                         val isSelected = desc == selected
-                        Card(
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp)
-                                .combinedClickable(
-                                    onClick = { onSelect(desc) },
-                                    onLongClick = { editingDesc = desc }
-                                ),
-                            border = BorderStroke(
-                                width = 2.dp,
-                                color = if (isSelected) Color.Blue else Color.LightGray
-                            ),
-                            shape = MaterialTheme.shapes.medium,
-                            elevation = CardDefaults.cardElevation(2.dp)
+                                .pointerInput(Unit) {
+                                    detectTapGestures(
+                                        onTap = { onSelect(desc) },  // 短按选中
+                                        onLongPress = { editingDesc = desc }  // 长按编辑/删除
+                                    )
+                                }
                         ) {
-                            Text(
-                                text = desc,
-                                modifier = Modifier.padding(16.dp),
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = if (isSelected) Color.Blue else Color.Black
-                            )
+                            OutlinedButton(
+                                onClick = {},  // 空 onClick，让手势检测优先
+                                border = BorderStroke(
+                                    width = 2.dp,
+                                    color = if (isSelected) Color.Blue else Color.LightGray
+                                ),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(desc)
+                            }
                         }
                     }
                 }
