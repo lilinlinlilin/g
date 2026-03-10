@@ -14,6 +14,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
+import androidx.compose.foundation.gestures.awaitPointerEventScope
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -22,6 +23,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.consumeAllChanges
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -195,25 +197,23 @@ fun SoundScreen(
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp)
                                 .pointerInput(Unit) {
-                                    while (true) {
-                                        // 等待按下事件
-                                        val down = awaitFirstDown(requireUnconsumed = false)
+                                    awaitPointerEventScope {
+                                        while (true) {
+                                            val down = awaitFirstDown(requireUnconsumed = false)
+                                            val change = awaitLongPressOrCancellation(down.id)
 
-                                        // 等待长按或取消
-                                        val longPress = awaitLongPressOrCancellation(down.id)
-
-                                        if (longPress != null) {
-                                            // 长按成功
-                                            editingDesc = desc
-                                        } else {
-                                            // 短按或取消 → 选中
-                                            onSelect(desc)
+                                            if (change != null) {
+                                                change.consumeAllChanges()
+                                                editingDesc = desc
+                                            } else {
+                                                onSelect(desc)
+                                            }
                                         }
                                     }
                                 }
                         ) {
                             OutlinedButton(
-                                onClick = { /* 留空，让 pointerInput 处理所有逻辑 */ },
+                                onClick = { /* 留空，让 pointerInput 处理 */ },
                                 border = BorderStroke(
                                     width = 2.dp,
                                     color = if (isSelected) Color.Blue else Color.LightGray
