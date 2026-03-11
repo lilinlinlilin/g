@@ -12,10 +12,15 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.indication
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.ripple.ripple
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
@@ -187,28 +193,36 @@ fun SoundScreen(
                 LazyColumn {
                     items(descriptions) { desc ->
                         val isSelected = desc == selected
+                        val interactionSource = remember { MutableInteractionSource() }
 
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp)
+                                .border(
+                                    width = 2.dp,
+                                    color = if (isSelected) Color.Blue else Color.LightGray,
+                                    shape = RoundedCornerShape(8.dp)
+                                )
                                 .pointerInput(Unit) {
                                     detectTapGestures(
                                         onTap = { onSelect(desc) },
                                         onLongPress = { editingDesc = desc }
                                     )
                                 }
+                                .indication(
+                                    interactionSource = interactionSource,
+                                    indication = ripple(bounded = true)
+                                )
                         ) {
-                            OutlinedButton(
-                                onClick = { /* 故意留空，使用 pointerInput 处理点击 */ },
-                                border = BorderStroke(
-                                    width = 2.dp,
-                                    color = if (isSelected) Color.Blue else Color.LightGray
-                                ),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(desc)
-                            }
+                            Text(
+                                text = desc,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                textAlign = TextAlign.Center,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
                         }
                     }
                 }
