@@ -12,15 +12,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.indication
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.ripple.ripple
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,11 +23,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.io.File
@@ -65,8 +60,8 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     SoundScreen(
-                        selected = selectedDesc,
-                        onSelect = { selectedDesc = it }
+                        onSelect = { selectedDesc = it },
+                        selected = selectedDesc
                     )
                 }
             }
@@ -178,13 +173,15 @@ fun SoundScreen(
         ) {
             Text("摇一摇播放声音", style = MaterialTheme.typography.headlineMedium)
             Spacer(Modifier.height(16.dp))
+
             Text(
-                "音频路径：\n$dirPath\n" +
+                text = "音频路径：\n$dirPath\n" +
                         "文件名必须完全等于描述（包括后缀，如 '开心.ogg' 或 '笑声.mp3'）\n" +
                         "位置：存储 → Android → data → com.ncorti.kotlin.template.app → files → sounds",
                 style = MaterialTheme.typography.bodyMedium,
                 color = Color.Gray
             )
+
             Spacer(Modifier.height(32.dp))
 
             if (descriptions.isEmpty()) {
@@ -193,36 +190,25 @@ fun SoundScreen(
                 LazyColumn {
                     items(descriptions) { desc ->
                         val isSelected = desc == selected
-                        val interactionSource = remember { MutableInteractionSource() }
 
-                        Box(
+                        OutlinedButton(
+                            onClick = { onSelect(desc) },
+                            border = BorderStroke(
+                                width = 2.dp,
+                                color = if (isSelected) Color.Blue else Color.LightGray
+                            ),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp)
-                                .border(
-                                    width = 2.dp,
-                                    color = if (isSelected) Color.Blue else Color.LightGray,
-                                    shape = RoundedCornerShape(8.dp)
-                                )
-                                .pointerInput(Unit) {
+                                .pointerInput(desc) {
                                     detectTapGestures(
-                                        onTap = { onSelect(desc) },
-                                        onLongPress = { editingDesc = desc }
+                                        onLongPress = {
+                                            editingDesc = desc
+                                        }
                                     )
                                 }
-                                .indication(
-                                    interactionSource = interactionSource,
-                                    indication = ripple(bounded = true)
-                                )
                         ) {
-                            Text(
-                                text = desc,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                textAlign = TextAlign.Center,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
+                            Text(desc)
                         }
                     }
                 }
@@ -230,7 +216,7 @@ fun SoundScreen(
         }
     }
 
-    // 添加对话框
+    // 添加新声音对话框
     if (showAddDialog) {
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
@@ -267,9 +253,10 @@ fun SoundScreen(
         )
     }
 
-    // 编辑/删除对话框
+    // 编辑 / 删除对话框
     if (editingDesc != null) {
         var editInput by remember { mutableStateOf(editingDesc!!) }
+
         AlertDialog(
             onDismissRequest = { editingDesc = null },
             title = { Text("编辑或删除：$editingDesc") },
@@ -311,6 +298,7 @@ fun SoundScreen(
                                 }
                             }
                         }
+                        if (selected == toDelete) onSelect(null)  // 删除后自动取消选中
                         editingDesc = null
                     }) {
                         Text("删除")
