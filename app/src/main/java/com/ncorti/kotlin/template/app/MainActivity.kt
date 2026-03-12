@@ -64,16 +64,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                     SoundScreen(
                         selected = selectedDesc,
                         onSelect = { selectedDesc = it },
-                        onPlayToggle = { desc ->
-                            if (currentPlayer?.isPlaying == true && selectedDesc == desc) {
-                                currentPlayer?.stop()
-                                currentPlayer?.release()
-                                currentPlayer = null
-                            } else {
-                                playAudio(desc)
-                                selectedDesc = desc  // 播放时自动选中，便于摇一摇控制
-                            }
-                        }
+                        onPlayToggle = { desc -> togglePlay(desc) }
                     )
                 }
             }
@@ -139,6 +130,17 @@ class MainActivity : ComponentActivity(), SensorEventListener {
             Toast.makeText(this@MainActivity, "未找到音频文件：$desc", Toast.LENGTH_SHORT).show()
         }
     }
+
+    fun togglePlay(desc: String) {
+        if (currentPlayer?.isPlaying == true && selectedDesc == desc) {
+            currentPlayer?.stop()
+            currentPlayer?.release()
+            currentPlayer = null
+        } else {
+            playAudio(desc)
+            selectedDesc = desc
+        }
+    }
 }
 
 @Composable
@@ -148,14 +150,13 @@ fun SoundScreen(
     onPlayToggle: (String) -> Unit
 ) {
     val context = LocalContext.current
+    val activity = context as? MainActivity  // 获取 Activity 实例
     val scope = rememberCoroutineScope()
 
     var descriptions by remember { mutableStateOf(listOf<String>()) }
     var showAddDialog by remember { mutableStateOf(false) }
     var inputDesc by remember { mutableStateOf("") }
     var editingDesc by remember { mutableStateOf<String?>(null) }
-
-    // 当前播放中的项（用于小按钮颜色反馈）
     var currentlyPlaying by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
@@ -213,7 +214,6 @@ fun SoundScreen(
                                 .padding(vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // 主按钮（风格与参考脚本一致）
                             OutlinedButton(
                                 onClick = { onSelect(desc) },
                                 modifier = Modifier
@@ -242,21 +242,21 @@ fun SoundScreen(
 
                             Spacer(Modifier.width(8.dp))
 
-                            // 小播放按钮：36dp 圆形、无内容、无图标，只用颜色区分状态
+                            // 小播放按钮：36dp 圆形、无文字无图标
                             Button(
                                 onClick = {
-                                    onPlayToggle(desc)
+                                    activity?.togglePlay(desc)
                                     currentlyPlaying = if (isPlaying) null else desc
                                 },
                                 modifier = Modifier.size(36.dp),
                                 shape = CircleShape,
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (isPlaying) Color.Red.copy(alpha = 0.8f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                                    containerColor = if (isPlaying) Color(0xFFF44336) else MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
                                 ),
                                 contentPadding = PaddingValues(0.dp),
-                                elevation = ButtonDefaults.buttonElevation(0.dp)
+                                elevation = ButtonDefaults.buttonElevation(2.dp)
                             ) {
-                                // 完全留空
+                                // 留空：纯颜色按钮
                             }
                         }
                     }
@@ -265,7 +265,7 @@ fun SoundScreen(
         }
     }
 
-    // 添加对话框
+    // 添加对话框（略）
     if (showAddDialog) {
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
@@ -285,8 +285,9 @@ fun SoundScreen(
                         val newList = (descriptions + inputDesc).distinct()
                         scope.launch {
                             context.soundDataStore.updateData { prefs ->
+                                val updated = newList.joinToString(",")
                                 prefs.toMutablePreferences().apply {
-                                    set(stringPreferencesKey("descriptions"), newList.joinToString(","))
+                                    set(stringPreferencesKey("descriptions"), updated)
                                 }
                             }
                         }
@@ -299,7 +300,7 @@ fun SoundScreen(
         )
     }
 
-    // 编辑/删除对话框
+    // 编辑/删除对话框（略）
     editingDesc?.let { current ->
         var editInput by remember { mutableStateOf(current) }
 
@@ -344,8 +345,7 @@ fun SoundScreen(
                         }
                         if (selected == toDelete) onSelect("")
                         if (currentlyPlaying == toDelete) {
-                            currentPlayer?.release()
-                            currentPlayer = null
+                            activity?.togglePlay(toDelete)  // 停止播放
                             currentlyPlaying = null
                         }
                         editingDesc = null
