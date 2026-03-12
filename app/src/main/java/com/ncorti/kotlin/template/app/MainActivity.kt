@@ -12,6 +12,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -25,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
@@ -43,9 +45,10 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     private var accelerometer: Sensor? = null
     private var currentPlayer: MediaPlayer? = null
     private var selectedDesc by mutableStateOf<String?>(null)
-    private var currentlyPlayingDesc by mutableStateOf<String?>(null)  // 新增：记录当前播放的描述
+    private var currentlyPlayingDesc by mutableStateOf<String?>(null)
 
-    private val shakeThreshold = 15f
+    // 摇晃阈值调整为 10f，更敏感（更容易触发）
+    private val shakeThreshold = 10f
     private var lastShake = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -59,7 +62,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
             MaterialTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
+                    color = Color.Transparent
                 ) {
                     SoundScreen(
                         selected = selectedDesc,
@@ -71,6 +74,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         }
     }
 
+    // onResume / onPause / onDestroy / onSensorChanged / playAudio / togglePlay 保持不变
     override fun onResume() {
         super.onResume()
         sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_GAME)
@@ -103,7 +107,6 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         val speed = sqrt(x * x + y * y + z * z) - SensorManager.GRAVITY_EARTH
 
         if (abs(speed) > shakeThreshold && selectedDesc != null) {
-            // 播放同一首时不重新播放
             if (currentPlayer?.isPlaying != true || currentlyPlayingDesc != selectedDesc) {
                 playAudio(selectedDesc!!)
             }
@@ -130,7 +133,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                 }
                 currentlyPlayingDesc = desc
             } catch (e: Exception) {
-                Toast.makeText(this@MainActivity, "播放失败：${e.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(this@MainActivity, "播放失敗：${e.message}", Toast.LENGTH_LONG).show()
                 currentlyPlayingDesc = null
             }
         } else {
@@ -180,79 +183,92 @@ fun SoundScreen(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
+        containerColor = Color.Transparent,
+        contentColor = MaterialTheme.colorScheme.onBackground,
         floatingActionButton = {
             FloatingActionButton(onClick = { showAddDialog = true }) {
                 Text("+")
             }
         }
     ) { innerPadding ->
-        Column(
+
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .background(MaterialTheme.colorScheme.background)
         ) {
-            if (descriptions.isEmpty()) {
-                Spacer(Modifier.weight(1f))
-            } else {
-                LazyColumn(modifier = Modifier.weight(1f)) {
-                    items(descriptions) { desc ->
-                        val isSelected = desc == selected
-                        val isPlaying = desc == currentlyPlaying
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(horizontal = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                if (descriptions.isEmpty()) {
+                    Spacer(Modifier.weight(1f))
+                    Text(
+                        text = "還沒有聲音描述～\n測試文字：如果 App 已全屏，這個文字會貼近邊緣",
+                        color = Color.Gray,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(Modifier.weight(1f))
+                } else {
+                    LazyColumn(modifier = Modifier.weight(1f)) {
+                        items(descriptions) { desc ->
+                            val isSelected = desc == selected
+                            val isPlaying = desc == currentlyPlaying
 
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // 主区域：统一手势处理
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                border = BorderStroke(
-                                    width = 2.dp,
-                                    color = if (isSelected) Color.Blue else Color.LightGray
-                                ),
-                                color = if (isSelected) Color.Blue.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surface,
+                            Row(
                                 modifier = Modifier
-                                    .weight(1f)
-                                    .pointerInput(desc) {
-                                        detectTapGestures(
-                                            onTap = { onSelect(desc) },
-                                            onLongPress = { editingDesc = desc }
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    border = BorderStroke(
+                                        width = 2.dp,
+                                        color = if (isSelected) Color.Blue else Color.LightGray
+                                    ),
+                                    color = if (isSelected) Color.Blue.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surface,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .pointerInput(desc) {
+                                            detectTapGestures(
+                                                onTap = { onSelect(desc) },
+                                                onLongPress = { editingDesc = desc }
+                                            )
+                                        }
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                                        contentAlignment = Alignment.Center  // 关键：让文字在 Surface 内水平垂直居中
+                                    ) {
+                                        Text(
+                                            text = desc,
+                                            color = if (isSelected) Color.Blue else MaterialTheme.colorScheme.onSurface,
+                                            textAlign = TextAlign.Center  // 文字水平居中
                                         )
                                     }
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                                    contentAlignment = Alignment.CenterStart
-                                ) {
-                                    Text(
-                                        text = desc,
-                                        color = if (isSelected) Color.Blue else MaterialTheme.colorScheme.onSurface
-                                    )
                                 }
+
+                                Spacer(Modifier.width(8.dp))
+
+                                ElevatedButton(
+                                    onClick = {
+                                        onPlayToggle(desc)
+                                        currentlyPlaying = if (isPlaying) null else desc
+                                    },
+                                    modifier = Modifier.size(36.dp),
+                                    shape = CircleShape,
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (isPlaying) Color.Red.copy(alpha = 0.8f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                                    ),
+                                    contentPadding = PaddingValues(0.dp)
+                                ) {}
                             }
-
-                            Spacer(Modifier.width(8.dp))
-
-                            // 小播放按钮：36dp 圆形、无任何内容
-                            Button(
-                                onClick = {
-                                    onPlayToggle(desc)
-                                    currentlyPlaying = if (isPlaying) null else desc
-                                },
-                                modifier = Modifier.size(36.dp),
-                                shape = CircleShape,
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (isPlaying) Color.Red.copy(alpha = 0.8f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-                                ),
-                                contentPadding = PaddingValues(0.dp),
-                                elevation = ButtonDefaults.buttonElevation(0.dp)
-                            ) {}
                         }
                     }
                 }
@@ -260,7 +276,7 @@ fun SoundScreen(
         }
     }
 
-    // 添加对话框（极简）
+    // 添加/编辑对话框保持不变
     if (showAddDialog) {
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
@@ -288,13 +304,12 @@ fun SoundScreen(
                         inputDesc = ""
                     }
                     showAddDialog = false
-                }) { Text("确定") }
+                }) { Text("確定") }
             },
             dismissButton = { TextButton(onClick = { showAddDialog = false }) { } }
         )
     }
 
-    // 编辑/删除对话框（极简）
     editingDesc?.let { current ->
         var editInput by remember { mutableStateOf(current) }
 
