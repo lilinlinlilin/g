@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.io.File
 import kotlin.math.abs
@@ -214,7 +215,6 @@ fun SoundScreen(
         }
     }
 
-    // 添加新声音对话框
     if (showAddDialog) {
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
@@ -232,8 +232,8 @@ fun SoundScreen(
                     if (inputDesc.isNotBlank()) {
                         val newList = (descriptions + inputDesc).distinct()
                         scope.launch {
-                            context.soundDataStore.updateData { prefs ->
-                                prefs.toMutablePreferences().apply {
+                            context.soundDataStore.updateData { preferences: Preferences ->
+                                preferences.toMutablePreferences().apply {
                                     set(stringPreferencesKey("descriptions"), newList.joinToString(","))
                                 }
                             }
@@ -251,9 +251,8 @@ fun SoundScreen(
         )
     }
 
-    // 编辑 / 删除对话框 ── 已使用局部非空变量 currentDesc 彻底避免 null-safety 问题
     if (editingDesc != null) {
-        val currentDesc: String = editingDesc!!  // 这里安全使用 !!，因为外层 if 已判断非空
+        val currentDesc = editingDesc!!   // 安全，因为外层 if 判断过非空
 
         var editInput by remember(currentDesc) { mutableStateOf(currentDesc) }
 
@@ -273,8 +272,8 @@ fun SoundScreen(
                     if (editInput.isNotBlank() && editInput != currentDesc) {
                         val newList = descriptions.map { if (it == currentDesc) editInput else it }
                         scope.launch {
-                            context.soundDataStore.updateData { prefs ->
-                                prefs.toMutablePreferences().apply {
+                            context.soundDataStore.updateData { preferences: Preferences ->
+                                preferences.toMutablePreferences().apply {
                                     set(stringPreferencesKey("descriptions"), newList.joinToString(","))
                                 }
                             }
@@ -290,8 +289,8 @@ fun SoundScreen(
                     TextButton(onClick = {
                         val newList = descriptions.filter { it != currentDesc }
                         scope.launch {
-                            context.soundDataStore.updateData { prefs ->
-                                prefs.toMutablePreferences().apply {
+                            context.soundDataStore.updateData { preferences: Preferences ->
+                                preferences.toMutablePreferences().apply {
                                     set(stringPreferencesKey("descriptions"), newList.joinToString(","))
                                 }
                             }
