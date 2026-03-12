@@ -36,7 +36,6 @@ import java.io.File
 import kotlin.math.abs
 import kotlin.math.sqrt
 
-// 必要 import
 import androidx.compose.foundation.layout.WindowInsets
 
 val Context.soundDataStore: DataStore<Preferences> by preferencesDataStore(name = "sounds")
@@ -194,33 +193,33 @@ fun SoundScreen(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        contentWindowInsets = WindowInsets(0.dp),  // 關閉多餘自動 padding
+        contentWindowInsets = WindowInsets(0.dp),
         floatingActionButton = {
             FloatingActionButton(onClick = { showAddDialog = true }) {
                 Text("+")
             }
         }
-    ) { _ ->  // 忽略 innerPadding !! 這是關鍵，避免大空白
+    ) { _ ->  // 忽略 innerPadding，不用它來 padding
 
-        // 用 Column + safeDrawingPadding 讓內容貼邊但不被蓋
+        // 用 Column 撐滿高度，從頂開始排列
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                // 推薦：用 safeDrawingPadding 自動處理 system bars + cutout + rounded corners
-                // 先試這個，如果空白太大再換成 .statusBarsPadding() + .navigationBarsPadding()
-                .safeDrawingPadding()
-                .padding(horizontal = 16.dp),  // 只左右留白，頂底自動適配
-            horizontalAlignment = Alignment.CenterHorizontally
+                .fillMaxSize()  // 確保撐滿整個螢幕
+                .safeDrawingPadding()  // 避開被蓋，但不加過多（如果空白太大可註解測試）
+                .padding(horizontal = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Top  // 從頂開始，不居中或往下沉
         ) {
             if (descriptions.isEmpty()) {
                 Spacer(Modifier.weight(1f))
-                Text(
-                    text = "尚未添加描述，點擊 + 添加",
-                    style = MaterialTheme.typography.bodyLarge
-                )
+                Text("尚未添加描述，點擊 + 添加", style = MaterialTheme.typography.bodyLarge)
                 Spacer(Modifier.weight(1f))
             } else {
-                LazyColumn(modifier = Modifier.weight(1f)) {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()  // LazyColumn 也撐滿，避免只佔部分高度
+                        .weight(1f)     // 讓它擴張
+                ) {
                     items(descriptions) { desc ->
                         val isSelected = desc == selected
                         val isPlaying = desc == currentlyPlaying
@@ -277,12 +276,17 @@ fun SoundScreen(
                             ) {}
                         }
                     }
+
+                    // 底部加額外空間，避免最後項目太貼底（根據導航欄調）
+                    item {
+                        Spacer(Modifier.height(96.dp))
+                    }
                 }
             }
         }
     }
 
-    // 添加對話框
+    // 添加對話框和編輯對話框保持原樣
     if (showAddDialog) {
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
@@ -316,7 +320,6 @@ fun SoundScreen(
         )
     }
 
-    // 編輯/刪除對話框
     editingDesc?.let { current ->
         var editInput by remember { mutableStateOf(current) }
 
