@@ -230,7 +230,7 @@ fun SoundScreen(
         }
     }
 
-    // 添加对话框
+    // 添加新声音对话框
     if (showAddDialog) {
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
@@ -269,13 +269,13 @@ fun SoundScreen(
         )
     }
 
-    // 编辑/删除对话框（长按触发）
-    if (editingDesc != null) {
-        var editInput by remember { mutableStateOf(editingDesc ?: "") }
+    // 编辑 / 删除对话框（长按触发）
+    editingDesc?.let { currentDesc ->
+        var editInput by remember { mutableStateOf(currentDesc) }
 
         AlertDialog(
             onDismissRequest = { editingDesc = null },
-            title = { Text("编辑或删除：$editingDesc") },
+            title = { Text("编辑或删除：$currentDesc") },
             text = {
                 OutlinedTextField(
                     value = editInput,
@@ -287,8 +287,8 @@ fun SoundScreen(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    if (editInput.isNotBlank() && editInput != editingDesc) {
-                        val old = editingDesc!!
+                    if (editInput.isNotBlank() && editInput != currentDesc) {
+                        val old = currentDesc
                         val newList = descriptions.map { if (it == old) editInput else it }
                         scope.launch {
                             context.soundDataStore.updateData { prefs ->
@@ -307,7 +307,7 @@ fun SoundScreen(
             dismissButton = {
                 Row {
                     TextButton(onClick = {
-                        val toDelete = editingDesc!!
+                        val toDelete = currentDesc
                         val newList = descriptions.filter { it != toDelete }
                         scope.launch {
                             context.soundDataStore.updateData { prefs ->
@@ -317,7 +317,10 @@ fun SoundScreen(
                                 }
                             }
                         }
-                        if (selected == toDelete) onSelect("") // 可选：删除后清空选中
+                        // 删除后，如果当前选中项正好是被删除的，则清空选中（传空字符串）
+                        if (selected == toDelete) {
+                            onSelect("")
+                        }
                         editingDesc = null
                     }) {
                         Text("删除", color = MaterialTheme.colorScheme.error)
