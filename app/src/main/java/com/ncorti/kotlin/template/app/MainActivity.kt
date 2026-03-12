@@ -66,10 +66,12 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                         onSelect = { selectedDesc = it },
                         onPlayToggle = { desc ->
                             if (currentPlayer?.isPlaying == true && selectedDesc == desc) {
-                                stopAudio()
+                                currentPlayer?.stop()
+                                currentPlayer?.release()
+                                currentPlayer = null
                             } else {
                                 playAudio(desc)
-                                selectedDesc = desc
+                                selectedDesc = desc  // 播放时自动选中，便于摇一摇控制
                             }
                         }
                     )
@@ -137,12 +139,6 @@ class MainActivity : ComponentActivity(), SensorEventListener {
             Toast.makeText(this@MainActivity, "未找到音频文件：$desc", Toast.LENGTH_SHORT).show()
         }
     }
-
-    private fun stopAudio() {
-        currentPlayer?.stop()
-        currentPlayer?.release()
-        currentPlayer = null
-    }
 }
 
 @Composable
@@ -159,8 +155,8 @@ fun SoundScreen(
     var inputDesc by remember { mutableStateOf("") }
     var editingDesc by remember { mutableStateOf<String?>(null) }
 
-    // 当前是否正在播放（用于视觉反馈）
-    var isPlaying by remember { mutableStateOf(false) }
+    // 当前播放中的项（用于小按钮颜色反馈）
+    var currentlyPlaying by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         context.soundDataStore.data
@@ -171,6 +167,10 @@ fun SoundScreen(
             .collect { newList ->
                 descriptions = newList
             }
+    }
+
+    val dirPath = remember {
+        context.getExternalFilesDir(null)?.resolve("sounds")?.absolutePath ?: "无法获取路径"
     }
 
     Scaffold(
@@ -188,33 +188,37 @@ fun SoundScreen(
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                "摇一摇播放声音",
-                style = MaterialTheme.typography.headlineMedium
-            )
+            Text("摇一摇播放声音", style = MaterialTheme.typography.headlineMedium)
             Spacer(Modifier.height(16.dp))
+
+            Text(
+                "把音频文件放到：\n$dirPath\n文件名必须完全等于描述（包括后缀）",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.Gray,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(24.dp))
 
             if (descriptions.isEmpty()) {
                 Text("还没有声音描述\n点击右下角 + 添加", color = Color.Gray)
             } else {
-                LazyColumn {
+                LazyColumn(modifier = Modifier.weight(1f)) {
                     items(descriptions) { desc ->
                         val isSelected = desc == selected
-                        val playingThis = isPlaying && isSelected
+                        val isPlaying = desc == currentlyPlaying
 
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // 主按钮（样式与原脚本一致）
+                            // 主按钮（风格与参考脚本一致）
                             OutlinedButton(
                                 onClick = { onSelect(desc) },
                                 modifier = Modifier
                                     .weight(1f)
-                                    .pointerInput(Unit) {
+                                    .pointerInput(desc) {
                                         detectTapGestures(
                                             onLongPress = { editingDesc = desc }
                                         )
@@ -238,21 +242,21 @@ fun SoundScreen(
 
                             Spacer(Modifier.width(8.dp))
 
-                            // 小播放按钮（无文字、无图标、圆形、极简）
+                            // 小播放按钮：36dp 圆形、无内容、无图标，只用颜色区分状态
                             Button(
                                 onClick = {
                                     onPlayToggle(desc)
-                                    isPlaying = !isPlaying || !playingThis
+                                    currentlyPlaying = if (isPlaying) null else desc
                                 },
-                                modifier = Modifier.size(40.dp),
+                                modifier = Modifier.size(36.dp),
                                 shape = CircleShape,
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (playingThis) Color.Red.copy(alpha = 0.7f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
-                                    contentColor = Color.White
+                                    containerColor = if (isPlaying) Color.Red.copy(alpha = 0.8f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
                                 ),
-                                contentPadding = PaddingValues(0.dp)
+                                contentPadding = PaddingValues(0.dp),
+                                elevation = ButtonDefaults.buttonElevation(0.dp)
                             ) {
-                                // 留空：无文字、无图标，只用颜色表示状态
+                                // 完全留空
                             }
                         }
                     }
@@ -261,7 +265,7 @@ fun SoundScreen(
         }
     }
 
-    // 添加对话框（保持原样）
+    // 添加对话框
     if (showAddDialog) {
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
@@ -271,7 +275,8 @@ fun SoundScreen(
                     value = inputDesc,
                     onValueChange = { inputDesc = it.trim() },
                     label = { Text("描述（必须包含后缀，如 '开心.ogg'）") },
-                    singleLine = true
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
                 )
             },
             confirmButton = {
@@ -280,72 +285,69 @@ fun SoundScreen(
                         val newList = (descriptions + inputDesc).distinct()
                         scope.launch {
                             context.soundDataStore.updateData { prefs ->
-                                val updated = newList.joinToString(",")
                                 prefs.toMutablePreferences().apply {
-                                    set(stringPreferencesKey("descriptions"), updated)
+                                    set(stringPreferencesKey("descriptions"), newList.joinToString(","))
                                 }
                             }
                         }
                         inputDesc = ""
                     }
                     showAddDialog = false
-                }) {
-                    Text("添加")
-                }
+                }) { Text("添加") }
             },
-            dismissButton = {
-                TextButton(onClick = { showAddDialog = false }) { Text("取消") }
-            }
+            dismissButton = { TextButton(onClick = { showAddDialog = false }) { Text("取消") } }
         )
     }
 
-    // 编辑/删除对话框（保持原样）
-    if (editingDesc != null) {
-        var editInput by remember { mutableStateOf(editingDesc ?: "") }
+    // 编辑/删除对话框
+    editingDesc?.let { current ->
+        var editInput by remember { mutableStateOf(current) }
+
         AlertDialog(
             onDismissRequest = { editingDesc = null },
-            title = { Text("编辑或删除：$editingDesc") },
+            title = { Text("编辑或删除：$current") },
             text = {
                 OutlinedTextField(
                     value = editInput,
                     onValueChange = { editInput = it.trim() },
                     label = { Text("修改描述（保持后缀）") },
-                    singleLine = true
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
                 )
             },
             confirmButton = {
                 TextButton(onClick = {
-                    if (editInput.isNotBlank() && editInput != editingDesc) {
-                        val old = editingDesc!!
-                        val newList = descriptions.map { if (it == old) editInput else it }
+                    if (editInput.isNotBlank() && editInput != current) {
+                        val newList = descriptions.map { if (it == current) editInput else it }
                         scope.launch {
                             context.soundDataStore.updateData { prefs ->
-                                val updated = newList.joinToString(",")
                                 prefs.toMutablePreferences().apply {
-                                    set(stringPreferencesKey("descriptions"), updated)
+                                    set(stringPreferencesKey("descriptions"), newList.joinToString(","))
                                 }
                             }
                         }
                     }
                     editingDesc = null
-                }) {
-                    Text("保存修改")
-                }
+                }) { Text("保存修改") }
             },
             dismissButton = {
                 Row {
                     TextButton(onClick = {
-                        val toDelete = editingDesc!!
+                        val toDelete = current
                         val newList = descriptions.filter { it != toDelete }
                         scope.launch {
                             context.soundDataStore.updateData { prefs ->
-                                val updated = newList.joinToString(",")
                                 prefs.toMutablePreferences().apply {
-                                    set(stringPreferencesKey("descriptions"), updated)
+                                    set(stringPreferencesKey("descriptions"), newList.joinToString(","))
                                 }
                             }
                         }
                         if (selected == toDelete) onSelect("")
+                        if (currentlyPlaying == toDelete) {
+                            currentPlayer?.release()
+                            currentPlayer = null
+                            currentlyPlaying = null
+                        }
                         editingDesc = null
                     }) {
                         Text("删除", color = MaterialTheme.colorScheme.error)
