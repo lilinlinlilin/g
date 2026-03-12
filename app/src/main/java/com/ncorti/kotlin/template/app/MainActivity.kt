@@ -27,7 +27,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.WindowInsets
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
@@ -36,6 +35,9 @@ import kotlinx.coroutines.launch
 import java.io.File
 import kotlin.math.abs
 import kotlin.math.sqrt
+
+// 重要：加入這個 import 來使用 WindowInsets(0.dp)
+import androidx.compose.foundation.layout.WindowInsets
 
 val Context.soundDataStore: DataStore<Preferences> by preferencesDataStore(name = "sounds")
 
@@ -53,7 +55,6 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // 啟用 edge-to-edge，讓系統欄透明（狀態欄 + 導航欄）
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.auto(
                 lightScrim = android.graphics.Color.TRANSPARENT,
@@ -167,7 +168,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
 @Composable
 fun SoundScreen(
     selected: String?,
-    onSelect: (String) -> Unit,
+    onSelect: (String?) -> Unit,   // 修改為接受 String?，允許傳 null
     onPlayToggle: (String) -> Unit
 ) {
     val context = LocalContext.current
@@ -192,7 +193,7 @@ fun SoundScreen(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        // 關鍵：阻止 Scaffold 自動加入超大系統欄 padding（解決「留很大距離」）
+        // 關鍵：避免 Scaffold 自動加入過大的系統欄 padding
         contentWindowInsets = WindowInsets(0.dp),
         floatingActionButton = {
             FloatingActionButton(onClick = { showAddDialog = true }) {
@@ -203,7 +204,7 @@ fun SoundScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)  // 現在 innerPadding 很小，不會留大空白
+                .padding(innerPadding)
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -221,7 +222,6 @@ fun SoundScreen(
                                 .padding(vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // 主區域：統一手勢處理
                             Surface(
                                 shape = RoundedCornerShape(12.dp),
                                 border = BorderStroke(
@@ -253,7 +253,6 @@ fun SoundScreen(
 
                             Spacer(Modifier.width(8.dp))
 
-                            // 小播放按钮
                             Button(
                                 onClick = {
                                     onPlayToggle(desc)
@@ -274,7 +273,6 @@ fun SoundScreen(
         }
     }
 
-    // 添加對話框
     if (showAddDialog) {
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
@@ -308,7 +306,6 @@ fun SoundScreen(
         )
     }
 
-    // 編輯/刪除對話框
     editingDesc?.let { current ->
         var editInput by remember { mutableStateOf(current) }
 
