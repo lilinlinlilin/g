@@ -47,7 +47,6 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     private var selectedDesc by mutableStateOf<String?>(null)
     private var currentlyPlayingDesc by mutableStateOf<String?>(null)
 
-    // 摇晃阈值 6f（极敏感）
     private val shakeThreshold = 6f
     private var lastShake = 0L
 
@@ -67,13 +66,15 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                     SoundScreen(
                         selected = selectedDesc,
                         onSelect = { selectedDesc = it },
-                        onPlayToggle = { desc -> togglePlay(desc) }
+                        onPlayToggle = { desc -> togglePlay(desc) },
+                        currentlyPlayingDesc = currentlyPlayingDesc  // 向下传递状态
                     )
                 }
             }
         }
     }
 
+    // onResume / onPause / onDestroy / onSensorChanged / playAudio / togglePlay 保持不变
     override fun onResume() {
         super.onResume()
         sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_GAME)
@@ -129,9 +130,9 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                     setDataSource(audioFile.absolutePath)
                     prepare()
 
-                    // 关键修复：播放结束时自动恢复按钮状态
+                    // 播放结束时自动恢复按钮状态
                     setOnCompletionListener {
-                        currentlyPlayingDesc = null  // 播放完自动清空状态，按钮颜色恢复
+                        currentlyPlayingDesc = null
                     }
 
                     start()
@@ -164,7 +165,8 @@ class MainActivity : ComponentActivity(), SensorEventListener {
 fun SoundScreen(
     selected: String?,
     onSelect: (String) -> Unit,
-    onPlayToggle: (String) -> Unit
+    onPlayToggle: (String) -> Unit,
+    currentlyPlayingDesc: String?  // 从 Activity 接收状态
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -173,7 +175,6 @@ fun SoundScreen(
     var showAddDialog by remember { mutableStateOf(false) }
     var inputDesc by remember { mutableStateOf("") }
     var editingDesc by remember { mutableStateOf<String?>(null) }
-    var currentlyPlaying by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         context.soundDataStore.data
@@ -221,7 +222,7 @@ fun SoundScreen(
                     LazyColumn(modifier = Modifier.weight(1f)) {
                         items(descriptions) { desc ->
                             val isSelected = desc == selected
-                            val isPlaying = desc == currentlyPlaying
+                            val isPlaying = desc == currentlyPlayingDesc  // 使用从 Activity 传来的状态
 
                             Row(
                                 modifier = Modifier
@@ -266,7 +267,6 @@ fun SoundScreen(
                                 ElevatedButton(
                                     onClick = {
                                         onPlayToggle(desc)
-                                        currentlyPlaying = if (isPlaying) null else desc
                                     },
                                     modifier = Modifier.size(36.dp),
                                     shape = CircleShape,
@@ -283,7 +283,6 @@ fun SoundScreen(
         }
     }
 
-    // 添加/编辑对话框保持不变
     if (showAddDialog) {
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
@@ -360,9 +359,8 @@ fun SoundScreen(
                             }
                         }
                         if (selected == toDelete) onSelect("")
-                        if (currentlyPlaying == toDelete) {
+                        if (currentlyPlayingDesc == toDelete) {
                             onPlayToggle(toDelete)
-                            currentlyPlaying = null
                         }
                         editingDesc = null
                     }) {
