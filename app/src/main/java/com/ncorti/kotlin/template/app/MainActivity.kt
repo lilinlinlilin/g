@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
@@ -68,6 +69,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         }
     }
 
+    // 传感器相关代码保持不变（略去中间部分以节省篇幅）
     override fun onResume() {
         super.onResume()
         sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_GAME)
@@ -102,9 +104,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         }
     }
 
-    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
-        // 空实现
-    }
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
 
     private fun playAudio(desc: String) {
         currentPlayer?.release()
@@ -142,6 +142,14 @@ fun SoundScreen(
     var inputDesc by remember { mutableStateOf("") }
     var editingDesc by remember { mutableStateOf<String?>(null) }
 
+    // 日志列表（用于显示短按/长按事件）
+    var gestureLogs by remember { mutableStateOf(listOf<String>()) }
+
+    fun logGesture(message: String) {
+        val time = java.text.SimpleDateFormat("HH:mm:ss.SSS").format(java.util.Date())
+        gestureLogs = (gestureLogs + "[$time] $message").takeLast(8)  // 保留最近8条
+    }
+
     LaunchedEffect(Unit) {
         context.soundDataStore.data
             .map { prefs ->
@@ -172,41 +180,71 @@ fun SoundScreen(
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                "摇一摇播放声音",
-                style = MaterialTheme.typography.headlineMedium
-            )
+            Text("摇一摇播放声音", style = MaterialTheme.typography.headlineMedium)
             Spacer(Modifier.height(16.dp))
 
             Text(
-                "把音频文件放到：\n$dirPath\n" +
-                        "文件名必须完全等于描述（包括后缀，例如 '开心.ogg' 或 '笑声.mp3'）\n" +
-                        "路径通常在：Android/data/你的包名/files/sounds",
+                "把音频文件放到：\n$dirPath\n文件名必须完全等于描述（包括后缀）",
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color.Gray
+                color = Color.Gray,
+                textAlign = TextAlign.Center
             )
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(24.dp))
+
+            // 日志显示区域
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(140.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(12.dp)
+                ) {
+                    Text("手势调试日志（短按/长按）", style = MaterialTheme.typography.titleSmall)
+                    Spacer(Modifier.height(4.dp))
+                    LazyColumn {
+                        items(gestureLogs) { log ->
+                            Text(log, style = MaterialTheme.typography.bodySmall, color = Color.DarkGray)
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
 
             if (descriptions.isEmpty()) {
                 Text("还没有声音描述\n点击右下角 + 添加", color = Color.Gray)
             } else {
-                LazyColumn {
+                LazyColumn(modifier = Modifier.weight(1f)) {
                     items(descriptions) { desc ->
                         val isSelected = desc == selected
 
                         Surface(
-                            onClick = { onSelect(desc) },
                             shape = RoundedCornerShape(12.dp),
                             border = BorderStroke(
                                 width = 2.dp,
                                 color = if (isSelected) Color.Blue else Color.LightGray
                             ),
+                            color = if (isSelected) Color.Blue.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surface,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp)
-                                .pointerInput(Unit) {
+                                .pointerInput(desc) {  // key = desc 避免重组问题
                                     detectTapGestures(
-                                        onLongPress = {
+                                        onPress = { offset ->
+                                            logGesture("按下 → $desc")
+                                            tryAwaitRelease()
+                                            logGesture("抬起 → $desc （如果没有长按则视为短按）")
+                                        },
+                                        onTap = {
+                                            logGesture("短按触发 → 选中 $desc")
+                                            onSelect(desc)
+                                        },
+                                        onLongPress = { offset ->
+                                            logGesture("长按触发！ → 编辑/删除 $desc")
                                             editingDesc = desc
                                         }
                                     )
@@ -215,7 +253,7 @@ fun SoundScreen(
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                                    .padding(horizontal = 16.dp, vertical = 14.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
@@ -230,7 +268,7 @@ fun SoundScreen(
         }
     }
 
-    // 添加新声音对话框
+    // 添加对话框（保持不变，略）
     if (showAddDialog) {
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
@@ -250,32 +288,27 @@ fun SoundScreen(
                         val newList = (descriptions + inputDesc).distinct()
                         scope.launch {
                             context.soundDataStore.updateData { prefs ->
-                                val updated = newList.joinToString(",")
                                 prefs.toMutablePreferences().apply {
-                                    set(stringPreferencesKey("descriptions"), updated)
+                                    set(stringPreferencesKey("descriptions"), newList.joinToString(","))
                                 }
                             }
                         }
                         inputDesc = ""
                     }
                     showAddDialog = false
-                }) {
-                    Text("添加")
-                }
+                }) { Text("添加") }
             },
-            dismissButton = {
-                TextButton(onClick = { showAddDialog = false }) { Text("取消") }
-            }
+            dismissButton = { TextButton(onClick = { showAddDialog = false }) { Text("取消") } }
         )
     }
 
-    // 编辑 / 删除对话框（长按触发）
-    editingDesc?.let { currentDesc ->
-        var editInput by remember { mutableStateOf(currentDesc) }
+    // 编辑/删除对话框（略微优化结构）
+    editingDesc?.let { current ->
+        var editInput by remember { mutableStateOf(current) }
 
         AlertDialog(
             onDismissRequest = { editingDesc = null },
-            title = { Text("编辑或删除：$currentDesc") },
+            title = { Text("编辑或删除：$current") },
             text = {
                 OutlinedTextField(
                     value = editInput,
@@ -287,40 +320,32 @@ fun SoundScreen(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    if (editInput.isNotBlank() && editInput != currentDesc) {
-                        val old = currentDesc
-                        val newList = descriptions.map { if (it == old) editInput else it }
+                    if (editInput.isNotBlank() && editInput != current) {
+                        val newList = descriptions.map { if (it == current) editInput else it }
                         scope.launch {
                             context.soundDataStore.updateData { prefs ->
-                                val updated = newList.joinToString(",")
                                 prefs.toMutablePreferences().apply {
-                                    set(stringPreferencesKey("descriptions"), updated)
+                                    set(stringPreferencesKey("descriptions"), newList.joinToString(","))
                                 }
                             }
                         }
                     }
                     editingDesc = null
-                }) {
-                    Text("保存修改")
-                }
+                }) { Text("保存修改") }
             },
             dismissButton = {
                 Row {
                     TextButton(onClick = {
-                        val toDelete = currentDesc
+                        val toDelete = current
                         val newList = descriptions.filter { it != toDelete }
                         scope.launch {
                             context.soundDataStore.updateData { prefs ->
-                                val updated = newList.joinToString(",")
                                 prefs.toMutablePreferences().apply {
-                                    set(stringPreferencesKey("descriptions"), updated)
+                                    set(stringPreferencesKey("descriptions"), newList.joinToString(","))
                                 }
                             }
                         }
-                        // 删除后，如果当前选中项正好是被删除的，则清空选中（传空字符串）
-                        if (selected == toDelete) {
-                            onSelect("")
-                        }
+                        if (selected == toDelete) onSelect("")
                         editingDesc = null
                     }) {
                         Text("删除", color = MaterialTheme.colorScheme.error)
