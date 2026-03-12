@@ -16,7 +16,7 @@ android {
         targetSdk = 35  // 保持 35 即可全屏（或改 36 更未來相容）
         namespace = APP_ID
 
-        applicationId = APP
+        applicationId ="APP"
         versionCode = APP_VERSION_CODE.toInt()
         versionName = APP_VERSION_NAME
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
