@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- 改用這個 parent（Material 2 或 AppCompat 兼容） -->
-    <style name="AppTheme" parent="Theme.MaterialComponents.DayNight.NoActionBar">
-        <!-- 或用 Theme.AppCompat.Light.NoActionBar，如果沒 material library -->
+    <!-- 用 AppCompat 基礎主題，build 一定過 -->
+    <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <!-- 如果不想要日夜自動切換，用 Theme.AppCompat.Light.NoActionBar -->
 
         <item name="colorPrimary">@color/colorPrimary</item>
         <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
