@@ -9,10 +9,11 @@ val APP_VERSION_CODE : String by project
 val APP_ID : String by project
 
 android {
-    compileSdk = libs.versions.compile.sdk.version.get().toInt()
+    compileSdk = 35  // 強制升級到 35（Android 15+），確保資源兼容
 
     defaultConfig {
         minSdk = libs.versions.min.sdk.version.get().toInt()
+        targetSdk = 35  // 關鍵！改成 35，讓系統強制 edge-to-edge 全屏填滿
         namespace = APP_ID
 
         applicationId = APP_ID
@@ -65,11 +66,11 @@ dependencies {
 
     // Compose + Material 3
     implementation(platform(libs.compose.bom))
-    implementation(libs.compose.material)           // 可选保留
+    implementation(libs.compose.material)           // 可選保留
     implementation(libs.compose.foundation)
     implementation(libs.compose.ui)
     implementation(libs.androidx.activity.compose)
-    implementation(libs.androidx.compose.material3) // 关键：修复 unresolved
+    implementation(libs.androidx.compose.material3)
 
     // DataStore
     implementation(libs.androidx.datastore.preferences)
