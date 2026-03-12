@@ -36,7 +36,7 @@ import java.io.File
 import kotlin.math.abs
 import kotlin.math.sqrt
 
-// 重要：加入這個 import 來使用 WindowInsets(0.dp)
+// 重要 import
 import androidx.compose.foundation.layout.WindowInsets
 
 val Context.soundDataStore: DataStore<Preferences> by preferencesDataStore(name = "sounds")
@@ -55,6 +55,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // 啟用 edge-to-edge，讓內容延伸到系統欄後面（透明）
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.auto(
                 lightScrim = android.graphics.Color.TRANSPARENT,
@@ -168,7 +169,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
 @Composable
 fun SoundScreen(
     selected: String?,
-    onSelect: (String?) -> Unit,   // 修改為接受 String?，允許傳 null
+    onSelect: (String?) -> Unit,
     onPlayToggle: (String) -> Unit
 ) {
     val context = LocalContext.current
@@ -193,25 +194,36 @@ fun SoundScreen(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        // 關鍵：避免 Scaffold 自動加入過大的系統欄 padding
+        // 關鍵：關閉 Scaffold 自動加入的 insets padding（避免大空白）
         contentWindowInsets = WindowInsets(0.dp),
         floatingActionButton = {
             FloatingActionButton(onClick = { showAddDialog = true }) {
                 Text("+")
             }
         }
-    ) { innerPadding ->
+    ) { _ ->  // 故意忽略 innerPadding，不用它來 padding（這是解決大距離的核心）
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
-                .padding(16.dp),
+                // 只加左右 padding，頂底讓內容貼近邊緣（背景會延伸到系統欄）
+                .padding(horizontal = 16.dp)
+                // 如果頂部內容被狀態欄蓋住，再開下面這行測試
+                // .statusBarsPadding()
+                // 如果整體需要避開劉海/圓角/手勢區域，再開這行
+                // .safeDrawingPadding()
+            ,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             if (descriptions.isEmpty()) {
+                // 空列表時，讓 FAB 居中或加提示
+                Spacer(Modifier.weight(1f))
+                Text("尚未添加聲音描述", style = MaterialTheme.typography.bodyLarge)
                 Spacer(Modifier.weight(1f))
             } else {
-                LazyColumn(modifier = Modifier.weight(1f)) {
+                LazyColumn(
+                    modifier = Modifier.weight(1f)
+                ) {
                     items(descriptions) { desc ->
                         val isSelected = desc == selected
                         val isPlaying = desc == currentlyPlaying
@@ -219,7 +231,7 @@ fun SoundScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 4.dp),
+                                .padding(vertical = 8.dp),  // 加大垂直間距，讓列表更舒適
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Surface(
@@ -270,9 +282,13 @@ fun SoundScreen(
                     }
                 }
             }
+
+            // 可選：底部加一點空間，避免最後項目被導航欄蓋太緊（根據你的手機調 64~100.dp）
+            Spacer(Modifier.height(80.dp))
         }
     }
 
+    // 添加對話框（不變）
     if (showAddDialog) {
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
@@ -306,6 +322,7 @@ fun SoundScreen(
         )
     }
 
+    // 編輯/刪除對話框（不變）
     editingDesc?.let { current ->
         var editInput by remember { mutableStateOf(current) }
 
