@@ -27,7 +27,6 @@ import androidx.compose.ui.unit.dp
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.io.File
 import kotlin.math.abs
@@ -252,13 +251,15 @@ fun SoundScreen(
         )
     }
 
-    // 编辑 / 删除对话框   ← 这里已修复 null-safety 问题
+    // 编辑 / 删除对话框 ── 已使用局部非空变量 currentDesc 彻底避免 null-safety 问题
     if (editingDesc != null) {
-        var editInput by remember { mutableStateOf(editingDesc) }  // 去掉 !!，利用 smart cast
+        val currentDesc: String = editingDesc!!  // 这里安全使用 !!，因为外层 if 已判断非空
+
+        var editInput by remember(currentDesc) { mutableStateOf(currentDesc) }
 
         AlertDialog(
             onDismissRequest = { editingDesc = null },
-            title = { Text("编辑或删除：$editingDesc") },
+            title = { Text("编辑或删除：$currentDesc") },
             text = {
                 OutlinedTextField(
                     value = editInput,
@@ -269,9 +270,8 @@ fun SoundScreen(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    if (editInput.isNotBlank() && editInput != editingDesc) {
-                        val old = editingDesc
-                        val newList = descriptions.map { if (it == old) editInput else it }
+                    if (editInput.isNotBlank() && editInput != currentDesc) {
+                        val newList = descriptions.map { if (it == currentDesc) editInput else it }
                         scope.launch {
                             context.soundDataStore.updateData { prefs ->
                                 prefs.toMutablePreferences().apply {
@@ -288,8 +288,7 @@ fun SoundScreen(
             dismissButton = {
                 Row {
                     TextButton(onClick = {
-                        val toDelete = editingDesc
-                        val newList = descriptions.filter { it != toDelete }
+                        val newList = descriptions.filter { it != currentDesc }
                         scope.launch {
                             context.soundDataStore.updateData { prefs ->
                                 prefs.toMutablePreferences().apply {
@@ -297,7 +296,7 @@ fun SoundScreen(
                                 }
                             }
                         }
-                        if (selected == toDelete) onSelect(null)  // 删除后自动取消选中
+                        if (selected == currentDesc) onSelect(null)
                         editingDesc = null
                     }) {
                         Text("删除")
