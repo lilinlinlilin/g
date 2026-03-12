@@ -47,8 +47,8 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     private var selectedDesc by mutableStateOf<String?>(null)
     private var currentlyPlayingDesc by mutableStateOf<String?>(null)
 
-    // 摇晃阈值调整为 10f，更敏感（更容易触发）
-    private val shakeThreshold = 10f
+    // 摇晃阈值调整为 8f（更敏感）
+    private val shakeThreshold = 8f
     private var lastShake = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -74,7 +74,6 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         }
     }
 
-    // onResume / onPause / onDestroy / onSensorChanged / playAudio / togglePlay 保持不变
     override fun onResume() {
         super.onResume()
         sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_GAME)
@@ -133,7 +132,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                 }
                 currentlyPlayingDesc = desc
             } catch (e: Exception) {
-                Toast.makeText(this@MainActivity, "播放失敗：${e.message}", Toast.LENGTH_LONG).show()
+                Toast.makeText(this@MainActivity, "播放失败：${e.message}", Toast.LENGTH_LONG).show()
                 currentlyPlayingDesc = null
             }
         } else {
@@ -244,12 +243,14 @@ fun SoundScreen(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .padding(horizontal = 16.dp, vertical = 14.dp),
-                                        contentAlignment = Alignment.Center  // 关键：让文字在 Surface 内水平垂直居中
+                                        contentAlignment = Alignment.Center  // 描述文字在按钮区域内居中
                                     ) {
                                         Text(
                                             text = desc,
                                             color = if (isSelected) Color.Blue else MaterialTheme.colorScheme.onSurface,
-                                            textAlign = TextAlign.Center  // 文字水平居中
+                                            textAlign = TextAlign.Center,  // 文字水平居中
+                                            maxLines = 1,  // 可选：防止文字过长换行
+                                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                                         )
                                     }
                                 }
@@ -276,7 +277,6 @@ fun SoundScreen(
         }
     }
 
-    // 添加/编辑对话框保持不变
     if (showAddDialog) {
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
