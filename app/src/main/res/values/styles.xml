@@ -1,11 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
 
     <!-- Base application theme. -->
     <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
-        <!-- Customize your theme here. -->
+        <!-- 保留你原本的顏色設定 -->
         <item name="colorPrimary">@color/colorPrimary</item>
         <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
         <item name="colorAccent">@color/colorAccent</item>
+
+        <!-- 加入全屏 / edge-to-edge 必要設定（讓系統欄透明） -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <!-- 狀態欄圖示顏色：true = 深色圖示（適合淺背景），false = 淺色圖示 -->
+        <item name="android:windowLightStatusBar">true</item>
+        <!-- 導航欄圖示顏色（Android O+） -->
+        <item name="android:windowLightNavigationBar" tools:targetApi="o_mr1">true</item>
+        <!-- 視窗背景（確保一致） -->
+        <item name="android:windowBackground">@android:color/white</item> <!-- 或你的背景色 -->
     </style>
 
 </resources>
