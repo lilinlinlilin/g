@@ -1,4 +1,4 @@
-package com.ncorti.kotlin.template.app
+package com.ncorti.kotlin.template
 
 import android.content.Context
 import android.hardware.Sensor
@@ -47,7 +47,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     private var selectedDesc by mutableStateOf<String?>(null)
     private var currentlyPlayingDesc by mutableStateOf<String?>(null)
 
-    // 摇晃阈值调整为 6f（极度敏感，轻微晃动即可触发）
+    // 摇晃阈值 6f（极敏感）
     private val shakeThreshold = 6f
     private var lastShake = 0L
 
@@ -128,6 +128,12 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                 currentPlayer = MediaPlayer().apply {
                     setDataSource(audioFile.absolutePath)
                     prepare()
+
+                    // 关键修复：播放结束时自动恢复按钮状态
+                    setOnCompletionListener {
+                        currentlyPlayingDesc = null  // 播放完自动清空状态，按钮颜色恢复
+                    }
+
                     start()
                 }
                 currentlyPlayingDesc = desc
@@ -243,12 +249,12 @@ fun SoundScreen(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .padding(horizontal = 16.dp, vertical = 14.dp),
-                                        contentAlignment = Alignment.Center  // 描述文字在按钮区域内居中
+                                        contentAlignment = Alignment.Center
                                     ) {
                                         Text(
                                             text = desc,
                                             color = if (isSelected) Color.Blue else MaterialTheme.colorScheme.onSurface,
-                                            textAlign = TextAlign.Center,  // 文字水平居中
+                                            textAlign = TextAlign.Center,
                                             maxLines = 1,
                                             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                                         )
