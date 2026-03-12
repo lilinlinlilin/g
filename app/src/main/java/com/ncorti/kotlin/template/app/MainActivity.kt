@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
@@ -60,7 +61,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
             MaterialTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = Color.Transparent
+                    color = Color.Transparent  // 讓最外層不畫背景，避免蓋住邊緣
                 ) {
                     SoundScreen(
                         selected = selectedDesc,
@@ -72,6 +73,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         }
     }
 
+    // onResume, onPause, onDestroy, onSensorChanged, playAudio, togglePlay 保持不變
     override fun onResume() {
         super.onResume()
         sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_GAME)
@@ -180,7 +182,7 @@ fun SoundScreen(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = Color.Transparent,
+        containerColor = Color.Transparent,  // 讓 Scaffold 本身透明
         contentColor = MaterialTheme.colorScheme.onBackground,
         floatingActionButton = {
             FloatingActionButton(onClick = { showAddDialog = true }) {
@@ -192,18 +194,22 @@ fun SoundScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
+                .background(MaterialTheme.colorScheme.background)  // 背景色填滿整個螢幕（包括系統欄下面）
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(innerPadding)
-                    .padding(horizontal = 16.dp),
+                    .padding(innerPadding)  // 內容自動避開狀態欄 + 導航欄
+                    .padding(horizontal = 16.dp),  // 只加左右間距，不要上下（避免推縮）
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 if (descriptions.isEmpty()) {
                     Spacer(Modifier.weight(1f))
-                    Text("還沒有聲音描述～", color = Color.Gray)
+                    Text(
+                        text = "還沒有聲音描述～\n測試：這個文字應該貼近螢幕邊緣（如果有邊框，請確認 targetSdk=35）",
+                        color = Color.Gray,
+                        textAlign = TextAlign.Center
+                    )
                     Spacer(Modifier.weight(1f))
                 } else {
                     LazyColumn(modifier = Modifier.weight(1f)) {
@@ -248,7 +254,6 @@ fun SoundScreen(
 
                                 Spacer(Modifier.width(8.dp))
 
-                                // 改用 ElevatedButton，解決 elevation 未解析問題，並有自然陰影
                                 ElevatedButton(
                                     onClick = {
                                         onPlayToggle(desc)
@@ -260,8 +265,6 @@ fun SoundScreen(
                                         containerColor = if (isPlaying) Color.Red.copy(alpha = 0.8f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
                                     ),
                                     contentPadding = PaddingValues(0.dp)
-                                    // ElevatedButton 預設有 elevation，無需額外指定
-                                    // 如需自訂，可加：elevation = ButtonDefaults.elevatedButtonElevation(defaultElevation = 2.dp)
                                 ) {}
                             }
                         }
@@ -271,6 +274,7 @@ fun SoundScreen(
         }
     }
 
+    // 添加/編輯對話框保持不變
     if (showAddDialog) {
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
