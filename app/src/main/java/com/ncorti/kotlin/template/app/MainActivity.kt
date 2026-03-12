@@ -1,4 +1,4 @@
-package com.ncorti.kotlin.template
+package com.ncorti.kotlin.template.app
 
 import android.content.Context
 import android.hardware.Sensor
