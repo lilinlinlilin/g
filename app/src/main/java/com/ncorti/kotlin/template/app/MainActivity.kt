@@ -47,8 +47,8 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     private var selectedDesc by mutableStateOf<String?>(null)
     private var currentlyPlayingDesc by mutableStateOf<String?>(null)
 
-    // 摇晃阈值调整为 8f（更敏感）
-    private val shakeThreshold = 8f
+    // 摇晃阈值调整为 6f（极度敏感，轻微晃动即可触发）
+    private val shakeThreshold = 6f
     private var lastShake = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -249,7 +249,7 @@ fun SoundScreen(
                                             text = desc,
                                             color = if (isSelected) Color.Blue else MaterialTheme.colorScheme.onSurface,
                                             textAlign = TextAlign.Center,  // 文字水平居中
-                                            maxLines = 1,  // 可选：防止文字过长换行
+                                            maxLines = 1,
                                             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                                         )
                                     }
@@ -277,6 +277,7 @@ fun SoundScreen(
         }
     }
 
+    // 添加/编辑对话框保持不变
     if (showAddDialog) {
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
