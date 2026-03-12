@@ -9,11 +9,11 @@ val APP_VERSION_CODE : String by project
 val APP_ID : String by project
 
 android {
-    compileSdk = 35  // 強制升級到 35（Android 15+），確保資源兼容
+    compileSdk = 36  // 已升級到 36，解決 AAR metadata 錯誤
 
     defaultConfig {
         minSdk = libs.versions.min.sdk.version.get().toInt()
-        targetSdk = 35  // 關鍵！改成 35，讓系統強制 edge-to-edge 全屏填滿
+        targetSdk = 35  // 保持 35 即可全屏（或改 36 更未來相容）
         namespace = APP_ID
 
         applicationId = APP_ID
@@ -66,7 +66,7 @@ dependencies {
 
     // Compose + Material 3
     implementation(platform(libs.compose.bom))
-    implementation(libs.compose.material)           // 可選保留
+    implementation(libs.compose.material)
     implementation(libs.compose.foundation)
     implementation(libs.compose.ui)
     implementation(libs.androidx.activity.compose)
