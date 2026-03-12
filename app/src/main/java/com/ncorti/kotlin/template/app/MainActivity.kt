@@ -1,6 +1,7 @@
 package com.ncorti.kotlin.template.app
 
 import android.content.Context
+import android.graphics.Color
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -12,8 +13,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.core.view.WindowCompat  // 重要 import
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -24,7 +25,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -53,18 +54,13 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // 關鍵：強制視窗占滿螢幕（DecorView 拉滿），解決「不是軟件區域」
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-
-        // 啟用 edge-to-edge + 透明系統欄
+        // 強化 edge-to-edge：明確透明 + light 圖示（解決黑邊/不透明問題）
         enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.auto(
-                lightScrim = android.graphics.Color.TRANSPARENT,
-                darkScrim = android.graphics.Color.TRANSPARENT
+            statusBarStyle = SystemBarStyle.light(
+                Color.TRANSPARENT, Color.TRANSPARENT
             ),
-            navigationBarStyle = SystemBarStyle.auto(
-                lightScrim = android.graphics.Color.TRANSPARENT,
-                darkScrim = android.graphics.Color.TRANSPARENT
+            navigationBarStyle = SystemBarStyle.light(
+                Color.TRANSPARENT, Color.TRANSPARENT
             )
         )
 
@@ -75,7 +71,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
             MaterialTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
+                    color = ComposeColor.Transparent  // 避免 Surface 蓋住背景
                 ) {
                     SoundScreen(
                         selected = selectedDesc,
@@ -170,7 +166,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
 @Composable
 fun SoundScreen(
     selected: String?,
-    onSelect: (String?) -> Unit,
+    onSelect: (String) -> Unit,
     onPlayToggle: (String) -> Unit
 ) {
     val context = LocalContext.current
@@ -193,91 +189,99 @@ fun SoundScreen(
             }
     }
 
-    // 用 Box 確保內容填滿視窗（現在視窗已滿，內容會跟著滿）
-    Box(modifier = Modifier.fillMaxSize()) {
-        Column(
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        containerColor = ComposeColor.Transparent,
+        contentColor = MaterialTheme.colorScheme.onBackground,
+        floatingActionButton = {
+            FloatingActionButton(onClick = { showAddDialog = true }) {
+                Text("+")
+            }
+        }
+    ) { innerPadding ->
+
+        // 關鍵：Box 填滿背景色，延伸到系統欄下面 → 消除黑邊
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 16.dp)
-                .safeContentPadding(),  // 避開系統欄蓋住內容，但不壓縮高度
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Top
+                .background(MaterialTheme.colorScheme.background)
         ) {
-            if (descriptions.isEmpty()) {
-                Spacer(Modifier.weight(1f))
-                Text("尚未添加描述，點擊 + 添加")
-                Spacer(Modifier.weight(1f))
-            } else {
-                LazyColumn(modifier = Modifier.weight(1f)) {
-                    items(descriptions) { desc ->
-                        // Row 內容保持原樣
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                border = BorderStroke(
-                                    width = 2.dp,
-                                    color = if (desc == selected) Color.Blue else Color.LightGray
-                                ),
-                                color = if (desc == selected) Color.Blue.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surface,
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)  // 內容避開狀態欄 + 導航欄
+                    .padding(horizontal = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                if (descriptions.isEmpty()) {
+                    Spacer(Modifier.weight(1f))
+                    Text("還沒有聲音描述～", color = ComposeColor.Gray)
+                    Spacer(Modifier.weight(1f))
+                } else {
+                    LazyColumn(modifier = Modifier.weight(1f)) {
+                        items(descriptions) { desc ->
+                            val isSelected = desc == selected
+                            val isPlaying = desc == currentlyPlaying
+
+                            Row(
                                 modifier = Modifier
-                                    .weight(1f)
-                                    .pointerInput(desc) {
-                                        detectTapGestures(
-                                            onTap = { onSelect(desc) },
-                                            onLongPress = { editingDesc = desc }
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    border = BorderStroke(
+                                        width = 2.dp,
+                                        color = if (isSelected) ComposeColor.Blue else ComposeColor.LightGray
+                                    ),
+                                    color = if (isSelected) ComposeColor.Blue.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surface,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .pointerInput(desc) {
+                                            detectTapGestures(
+                                                onTap = { onSelect(desc) },
+                                                onLongPress = { editingDesc = desc }
+                                            )
+                                        }
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                                        contentAlignment = Alignment.CenterStart
+                                    ) {
+                                        Text(
+                                            text = desc,
+                                            color = if (isSelected) ComposeColor.Blue else MaterialTheme.colorScheme.onSurface
                                         )
                                     }
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 14.dp),
-                                    contentAlignment = Alignment.CenterStart
-                                ) {
-                                    Text(
-                                        text = desc,
-                                        color = if (desc == selected) Color.Blue else MaterialTheme.colorScheme.onSurface
-                                    )
                                 }
+
+                                Spacer(Modifier.width(8.dp))
+
+                                Button(
+                                    onClick = {
+                                        onPlayToggle(desc)
+                                        currentlyPlaying = if (isPlaying) null else desc
+                                    },
+                                    modifier = Modifier.size(36.dp),
+                                    shape = CircleShape,
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (isPlaying) ComposeColor.Red.copy(alpha = 0.8f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                                    ),
+                                    contentPadding = PaddingValues(0.dp),
+                                    elevation = ButtonDefaults.elevation(0.dp)
+                                ) {}
                             }
-
-                            Spacer(Modifier.width(8.dp))
-
-                            Button(
-                                onClick = {
-                                    onPlayToggle(desc)
-                                    currentlyPlaying = if (desc == currentlyPlaying) null else desc
-                                },
-                                modifier = Modifier.size(36.dp),
-                                shape = CircleShape,
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (desc == currentlyPlaying) Color.Red.copy(alpha = 0.8f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-                                ),
-                                contentPadding = PaddingValues(0.dp),
-                                elevation = ButtonDefaults.buttonElevation(0.dp)
-                            ) {}
                         }
                     }
                 }
             }
         }
-
-        FloatingActionButton(
-            onClick = { showAddDialog = true },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(16.dp)
-        ) {
-            Text("+")
-        }
     }
 
-    // 添加對話框
+    // 添加/編輯對話框（保持原樣）
     if (showAddDialog) {
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
@@ -311,7 +315,6 @@ fun SoundScreen(
         )
     }
 
-    // 編輯/刪除對話框
     editingDesc?.let { current ->
         var editInput by remember { mutableStateOf(current) }
 
@@ -354,14 +357,14 @@ fun SoundScreen(
                                 }
                             }
                         }
-                        if (selected == toDelete) onSelect(null)
+                        if (selected == toDelete) onSelect("")
                         if (currentlyPlaying == toDelete) {
                             onPlayToggle(toDelete)
                             currentlyPlaying = null
                         }
                         editingDesc = null
                     }) {
-                        Text("刪除", color = MaterialTheme.colorScheme.error)
+                        Text("删除", color = MaterialTheme.colorScheme.error)
                     }
                     TextButton(onClick = { editingDesc = null }) { }
                 }
