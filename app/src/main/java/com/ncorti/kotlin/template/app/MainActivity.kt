@@ -47,7 +47,8 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     private var selectedDesc by mutableStateOf<String?>(null)
     private var currentlyPlayingDesc by mutableStateOf<String?>(null)
 
-    private val shakeThreshold = 6f
+    // 摇晃阈值调整为 3f（极端敏感，轻微晃动即可触发）
+    private val shakeThreshold = 3f
     private var lastShake = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -67,14 +68,13 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                         selected = selectedDesc,
                         onSelect = { selectedDesc = it },
                         onPlayToggle = { desc -> togglePlay(desc) },
-                        currentlyPlayingDesc = currentlyPlayingDesc  // 向下传递状态
+                        currentlyPlayingDesc = currentlyPlayingDesc
                     )
                 }
             }
         }
     }
 
-    // onResume / onPause / onDestroy / onSensorChanged / playAudio / togglePlay 保持不变
     override fun onResume() {
         super.onResume()
         sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_GAME)
@@ -130,7 +130,6 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                     setDataSource(audioFile.absolutePath)
                     prepare()
 
-                    // 播放结束时自动恢复按钮状态
                     setOnCompletionListener {
                         currentlyPlayingDesc = null
                     }
@@ -166,7 +165,7 @@ fun SoundScreen(
     selected: String?,
     onSelect: (String) -> Unit,
     onPlayToggle: (String) -> Unit,
-    currentlyPlayingDesc: String?  // 从 Activity 接收状态
+    currentlyPlayingDesc: String?
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -222,7 +221,7 @@ fun SoundScreen(
                     LazyColumn(modifier = Modifier.weight(1f)) {
                         items(descriptions) { desc ->
                             val isSelected = desc == selected
-                            val isPlaying = desc == currentlyPlayingDesc  // 使用从 Activity 传来的状态
+                            val isPlaying = desc == currentlyPlayingDesc
 
                             Row(
                                 modifier = Modifier
